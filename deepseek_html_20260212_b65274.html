@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vendedora - Sistema de Facturación</title>
+    <meta name="description" content="Sistema de facturación para vendedoras">
+    <meta name="theme-color" content="#2c3e50">
+    
+    <!-- Estilos profesionales -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <style>
+        /* Ajustes específicos para login */
+        .login-container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .login-header .logo-icon {
+            font-size: 3rem;
+            color: var(--secondary-color);
+        }
+        .login-header h1 {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            margin-top: 0.5rem;
+        }
+        .login-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--box-shadow);
+        }
+        .test-credentials {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .test-credentials strong {
+            color: var(--primary-color);
+        }
+        .producto-detalle {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            margin-top: 1rem;
+        }
+        .precio-grande {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        .stock-info {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .venta-rapida {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .hidden {
+            display: none !important;
+        }
+        /* Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Estado del servidor */
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 15px;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-size: 0.8rem;
+            font-weight: 600;
+            z-index: 200;
+            box-shadow: var(--box-shadow);
+        }
+        .connection-status.online {
+            background: var(--accent-color);
+            color: white;
+        }
+        .connection-status.offline {
+            background: var(--danger-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header (visible solo cuando está logueado) -->
+    <header id="mainHeader" style="display: none;">
+        <div class="header-container">
+            <div class="logo">
+                <span>📊</span>
+                <h1>Facturación</h1>
+            </div>
+            <div class="user-info">
+                <span id="userName">Vendedora</span>
+                <div class="avatar" id="userAvatar">V</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Estado del servidor (siempre visible) -->
+    <div id="serverStatus" class="connection-status online">
+        🔍 Verificando conexión...
+    </div>
+
+    <!-- Contenido principal -->
+    <main>
+        <!-- ========== PANEL DE LOGIN ========== -->
+        <div id="loginPanel" class="login-container" style="margin-top: 30px;">
+            <div class="login-header">
+                <div class="logo-icon">👗</div>
+                <h1>Sistema de Facturación</h1>
+                <p style="color: #666; margin-top: 0.5rem;">Inicia sesión para continuar</p>
+            </div>
+            
+            <div class="login-card">
+                <div id="loginError" style="background: #f8d7da; color: #721c24; padding: 0.8rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; display: none;"></div>
+                
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" id="usuario" class="form-control" placeholder="Ej: maria_g" value="maria_g">
+                </div>
+                
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="password" class="form-control" placeholder="••••••" value="123456">
+                </div>
+                
+                <button id="btnLogin" class="btn btn-primary" style="width: 100%; padding: 0.8rem; font-size: 1rem;">
+                    🔑 Iniciar Sesión
+                </button>
+                
+                <div class="test-credentials">
+                    <strong>Credenciales de prueba:</strong><br>
+                    maria_g / 123456<br>
+                    ana_r / 123456
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== PANEL DE VENTA (oculto hasta login) ========== -->
+        <div id="ventaPanel" style="display: none;">
+            <!-- Dashboard / Producto y venta -->
+            <div id="dashboardSection" class="page-section active">
+                <div class="dashboard-cards">
+                    <div class="card" id="ventasHoyCard">
+                        <div class="card-icon">💰</div>
+                        <h3>Ventas Hoy</h3>
+                        <div class="card-value" id="ventasHoyCount">0</div>
+                    </div>
+                    <div class="card" id="productosCard">
+                        <div class="card-icon">📦</div>
+                        <h3>Mi Producto</h3>
+                        <div class="card-value" id="productoStockValue">-</div>
+                    </div>
+                    <div class="card" id="estadoCard">
+                        <div class="card-icon">🛒</div>
+                        <h3>Estado</h3>
+                        <div class="card-value" id="estadoVenta">Activo</div>
+                    </div>
+                    <div class="card" id="logoutCard" onclick="App.logout()" style="cursor: pointer;">
+                        <div class="card-icon">🚪</div>
+                        <h3>Cerrar</h3>
+                        <div class="card-value" style="color: var(--danger-color);">Salir</div>
+                    </div>
+                </div>
+
+                <!-- Información de la vendedora -->
+                <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 1.1rem; font-weight: 600;" id="usuarioInfoNombre">Cargando...</div>
+                            <div style="font-size: 0.85rem; opacity: 0.9;" id="usuarioInfoTienda"></div>
+                        </div>
+                        <div class="avatar" style="background: var(--accent-color); width: 50px; height: 50px; font-size: 1.3rem;" id="usuarioInfoAvatar">
+                            V
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Producto disponible -->
+                <h2 class="section-title">
+                    📦 Producto Disponible
+                    <span id="productoNombreBadge"></span>
+                </h2>
+                
+                <div class="card" id="productoContainer">
+                    <div style="text-align: center; padding: 40px;">
+                        <div class="spinner" style="display: inline-block;"></div>
+                        <p style="margin-top: 10px; color: #7f8c8d;">Cargando producto...</p>
+                    </div>
+                </div>
+
+                <!-- Venta rápida -->
+                <div class="venta-rapida">
+                    <h3 style="color: var(--primary-color); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>🛒</span> Venta Rápida
+                    </h3>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="width: 100px;">
+                            <label style="font-size: 0.8rem; color: #666;">Cantidad</label>
+                            <input type="number" id="cantidad" value="1" min="1" max="100" class="form-control" style="text-align: center;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.8rem; color: #666;">Cliente (opcional)</label>
+                            <input type="text" id="clienteVenta" class="form-control" placeholder="Nombre del cliente">
+                        </div>
+                    </div>
+                    <button id="btnVender" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.8rem;">
+                        💰 Completar Venta
+                    </button>
+                    <div id="ventaResultado" style="margin-top: 1rem; display: none; padding: 0.8rem; border-radius: var(--border-radius);"></div>
+                </div>
+
+                <!-- Última venta (placeholder) -->
+                <div style="margin-top: 1.5rem;">
+                    <h3 class="section-title">📋 Última Venta</h3>
+                    <div id="ultimaVentaContainer" class="card" style="background: #f8f9fa;">
+                        <div style="text-align: center; color: #7f8c8d; padding: 1rem;">
+                            No hay ventas registradas aún
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Botón flotante para cerrar sesión rápido (visible solo cuando está logueado) -->
+    <button id="floatingLogoutBtn" class="floating-sale-btn" style="background: var(--danger-color); bottom: 20px; display: none;" onclick="App.logout()">
+        <span class="floating-icon">🚪</span>
+        <span class="floating-text">Cerrar Sesión</span>
+    </button>
+
+    <!-- Notificación -->
+    <div id="notification" class="notification" style="display: none;"></div>
+
+    <script>
+        // ===========================================
+        // APP VENDEDORA - FUNCIONALIDAD ORIGINAL COMPLETA
+        // ===========================================
+        
+        const API_URL = 'https://sistema-test-api.onrender.com'; // TU URL DE RENDER
+        
+        const App = {
+            usuario: null,
+            
+            init() {
+                console.log('App vendedora iniciada');
+                this.checkLogin();
+                this.setupEventListeners();
+                this.testServerConnection();
+            },
+            
+            async testServerConnection() {
+                const statusDiv = document.getElementById('serverStatus');
+                try {
+                    const response = await fetch(API_URL);
+                    if (response.ok) {
+                        const data = await response.json();
+                        statusDiv.className = 'connection-status online';
+                        statusDiv.innerHTML = `✓ Conectado - ${data.productos} productos`;
+                    } else {
+                        throw new Error('Error en respuesta');
+                    }
+                } catch (error) {
+                    console.error('Error conectando al servidor:', error);
+                    statusDiv.className = 'connection-status offline';
+                    statusDiv.innerHTML = '✗ Sin conexión';
+                }
+            },
+            
+            checkLogin() {
+                const savedUser = localStorage.getItem('test_vendedora');
+                if (savedUser) {
+                    try {
+                        this.usuario = JSON.parse(savedUser);
+                        this.showVentaPanel();
+                        this.cargarProducto();
+                        this.actualizarInfoUsuario();
+                    } catch (e) {
+                        this.showLoginPanel();
+                    }
+                } else {
+                    this.showLoginPanel();
+                }
+            },
+            
+            setupEventListeners() {
+                document.getElementById('btnLogin')?.addEventListener('click', () => this.login());
+                document.getElementById('btnVender')?.addEventListener('click', () => this.vender());
+                
+                // Enter para login
+                document.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && document.getElementById('loginPanel').style.display !== 'none') {
+                        this.login();
+                    }
+                });
+            },
+            
+            actualizarInfoUsuario() {
+                if (!this.usuario) return;
+                
+                document.getElementById('userName').textContent = this.usuario.nombre || 'Vendedora';
+                document.getElementById('userAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
+                document.getElementById('usuarioInfoNombre').textContent = this.usuario.nombre || 'Vendedora';
+                document.getElementById('usuarioInfoTienda').textContent = this.usuario.tienda || 'Tienda General';
+                document.getElementById('usuarioInfoAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
+            },
+            
+            async login() {
+                const usuario = document.getElementById('usuario').value.trim();
+                const password = document.getElementById('password').value;
+                
+                if (!usuario || !password) {
+                    this.showError('Usuario y contraseña son obligatorios');
+                    return;
+                }
+                
+                const btn = document.getElementById('btnLogin');
+                btn.disabled = true;
+                btn.textContent = '🔐 Verificando...';
+                
+                try {
+                    const response = await fetch(`${API_URL}/api/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ usuario, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        this.usuario = data.usuario;
+                        localStorage.setItem('test_vendedora', JSON.stringify(this.usuario));
+                        
+                        this.actualizarInfoUsuario();
+                        this.showVentaPanel();
+                        this.cargarProducto();
+                        this.showError('', 'clear');
+                    } else {
+                        this.showError(data.error || 'Credenciales incorrectas');
+                    }
+                } catch (error) {
+                    console.error('Error en login:', error);
+                    this.showError('Error de conexión con el servidor');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = '🔑 Iniciar Sesión';
+                }
+            },
+            
+            async cargarProducto() {
+                const container = document.getElementById('productoContainer');
+                
+                try {
+                    const response = await fetch(`${API_URL}/api/productos`);
+                    const productos = await response.json();
+                    
+                    if (productos && productos.length > 0) {
+                        const producto = productos[0];
+                        document.getElementById('productoStockValue').textContent = producto.stock;
+                        document.getElementById('productoNombreBadge').textContent = producto.nombre;
+                        
+                        container.innerHTML = `
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 1.3rem; font-weight: 600; color: var(--primary-color);">
+                                            ${producto.nombre}
+                                        </div>
+                                        <div style="margin-top: 0.3rem; color: #666; font-size: 0.9rem;">
+                                            ID: ${producto.id} • ${producto.categoria || 'General'}
+                                        </div>
+                                    </div>
+                                    <span class="stock-info">
+                                        Stock: ${producto.stock} unidades
+                                    </span>
+                                </div>
+                                <div class="precio-grande">
+                                    $${producto.precio.toFixed(2)}
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Actualizar última venta (simulada)
+                        this.cargarUltimaVenta();
+                    } else {
+                        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;">No hay productos disponibles</div>';
+                    }
+                } catch (error) {
+                    console.error('Error cargando producto:', error);
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 30px; color: #e74c3c;">
+                            ❌ Error cargando producto del servidor
+                        </div>
+                    `;
+                }
+            },
+            
+            cargarUltimaVenta() {
+                // Simulación de última venta
+                const container = document.getElementById('ultimaVentaContainer');
+                if (this.usuario) {
+                    container.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600;">${this.usuario.nombre || 'Vendedora'}</div>
+                                <div style="font-size: 0.8rem; color: #666;">Hoy, ${new Date().toLocaleTimeString()}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: bold; color: var(--accent-color);">$99.99</div>
+                                <div style="font-size: 0.8rem; color: #666;">1 producto</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            
+            vender() {
+                const cantidad = parseInt(document.getElementById('cantidad').value);
+                const cliente = document.getElementById('clienteVenta')?.value || 'Cliente General';
+                const resultado = document.getElementById('ventaResultado');
+                
+                if (cantidad < 1) {
+                    resultado.style.display = 'block';
+                    resultado.style.background = '#f8d7da';
+                    resultado.style.color = '#721c24';
+                    resultado.innerHTML = '❌ Cantidad inválida';
+                    return;
+                }
+                
+                // Simular venta
+                const total = 99.99 * cantidad;
+                
+                resultado.style.display = 'block';
+                resultado.style.background = '#d4edda';
+                resultado.style.color = '#155724';
+                resultado.innerHTML = `
+                    ✅ Venta registrada exitosamente<br>
+                    <small>Cliente: ${cliente} - $${total.toFixed(2)}</small>
+                `;
+                
+                // Actualizar contador de ventas hoy
+                const ventasHoy = document.getElementById('ventasHoyCount');
+                ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
+                
+                // Actualizar última venta
+                const container = document.getElementById('ultimaVentaContainer');
+                container.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 600;">${cliente}</div>
+                            <div style="font-size: 0.8rem; color: #666;">Ahora mismo</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: var(--accent-color);">$${total.toFixed(2)}</div>
+                            <div style="font-size: 0.8rem; color: #666;">${cantidad} ${cantidad === 1 ? 'producto' : 'productos'}</div>
+                        </div>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    resultado.style.display = 'none';
+                }, 3000);
+            },
+            
+            logout() {
+                localStorage.removeItem('test_vendedora');
+                this.usuario = null;
+                this.showLoginPanel();
+            },
+            
+            showLoginPanel() {
+                document.getElementById('loginPanel').style.display = 'block';
+                document.getElementById('ventaPanel').style.display = 'none';
+                document.getElementById('mainHeader').style.display = 'none';
+                document.getElementById('floatingLogoutBtn').style.display = 'none';
+                document.getElementById('usuario').focus();
+            },
+            
+            showVentaPanel() {
+                document.getElementById('loginPanel').style.display = 'none';
+                document.getElementById('ventaPanel').style.display = 'block';
+                document.getElementById('mainHeader').style.display = 'block';
+                document.getElementById('floatingLogoutBtn').style.display = 'flex';
+            },
+            
+            showError(message, type = 'error') {
+                const errorDiv = document.getElementById('loginError');
+                if (type === 'clear') {
+                    errorDiv.style.display = 'none';
+                    errorDiv.textContent = '';
+                } else {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = message;
+                }
+            }
+        };
+        
+        // Iniciar app
+        document.addEventListener('DOMContentLoaded', () => {
+            App.init();
+        });
+    </script>
+</body>
+</html>
