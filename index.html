@@ -92,6 +92,21 @@
         .avatar:hover {
             transform: scale(1.1);
         }
+        .logout-btn {
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 0.8rem;
+            transition: var(--transition);
+        }
+        .logout-btn:hover {
+            background: #c0392b;
+        }
         .floating-badge {
             background-color: var(--danger-color);
             color: white;
@@ -123,6 +138,10 @@
         }
         .remove-item-btn:hover {
             color: #c0392b;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
         }
     </style>
 </head>
@@ -160,7 +179,8 @@
             <div class="test-credentials">
                 <strong>Credenciales de prueba:</strong><br>
                 maria_g / 123456<br>
-                ana_r / 123456
+                ana_r / 123456<br>
+                <span style="color: var(--primary-color);">¡Y cualquier vendedora que crees desde Dueño!</span>
             </div>
         </div>
     </div>
@@ -175,7 +195,10 @@
                 </div>
                 <div class="user-info">
                     <span id="userName">Vendedora</span>
-                    <div class="avatar" id="userAvatar" title="Haz clic para cerrar sesión">V</div>
+                    <div class="avatar" id="userAvatar" title="Perfil">V</div>
+                    <button id="logoutBtn" class="logout-btn">
+                        🚪 Salir
+                    </button>
                 </div>
             </div>
         </header>
@@ -480,10 +503,10 @@
 
     <script>
         // ===========================================
-        // APP VENDEDORA - LOGIN CORREGIDO
+        // APP VENDEDORA - LOGIN REAL CON EL SERVIDOR
         // ===========================================
         
-        const API_URL = 'https://sistema-test-api.onrender.com';
+        const API_URL = 'https://sistema-test-api.onrender.com'; // TU URL DE RENDER
         
         const App = {
             usuario: null,
@@ -491,6 +514,7 @@
             productos: [],
             carrito: [],
             ventas: [],
+            categoriaActiva: 'todos',
             
             init() {
                 this.checkLogin();
@@ -499,6 +523,7 @@
                 this.setupNavigation();
                 this.setupFloatingButton();
                 this.setupSearchAndFilters();
+                this.setupReportes();
             },
             
             async testServerConnection() {
@@ -535,7 +560,7 @@
                 }
             },
             
-            // ========== LOGIN CORREGIDO - FUNCIONA CON 123456 ==========
+            // ========== LOGIN CORREGIDO - USA EL ENDPOINT REAL ==========
             async login() {
                 const usuario = document.getElementById('usuario').value.trim();
                 const password = document.getElementById('password').value;
@@ -550,39 +575,30 @@
                 btn.textContent = '🔐 Verificando...';
                 
                 try {
-                    // SOLUCIÓN: Aceptamos maria_g/123456 y ana_r/123456
-                    // Esto funciona porque en el servidor ESAS vendedoras existen
-                    if ((usuario === 'maria_g' || usuario === 'ana_r') && password === '123456') {
+                    // ✅ Usar el endpoint REAL de login que está en el servidor
+                    const response = await fetch(`${API_URL}/api/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ usuario, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        // ✅ Login exitoso con el servidor
+                        this.usuario = data.usuario;
+                        localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
                         
-                        // Obtener datos reales de la vendedora desde el servidor
-                        const response = await fetch(`${API_URL}/api/dueno/vendedoras`);
-                        const vendedoras = await response.json();
+                        this.actualizarInfoUsuario();
+                        this.showVentaPanel();
+                        this.cargarProductos();
+                        this.cargarVentas();
+                        this.showError('', 'clear');
                         
-                        const vendedoraEncontrada = vendedoras.find(v => v.usuario === usuario);
-                        
-                        if (vendedoraEncontrada) {
-                            this.usuario = {
-                                id: vendedoraEncontrada.id,
-                                nombre: vendedoraEncontrada.nombre,
-                                usuario: vendedoraEncontrada.usuario,
-                                tienda: vendedoraEncontrada.tienda,
-                                status: vendedoraEncontrada.status
-                            };
-                            
-                            localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
-                            
-                            this.actualizarInfoUsuario();
-                            this.showVentaPanel();
-                            this.cargarProductos();
-                            this.cargarVentas();
-                            this.showError('', 'clear');
-                            
-                            this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
-                        } else {
-                            this.showError('Usuario no encontrado en el servidor');
-                        }
+                        this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
                     } else {
-                        this.showError('Usuario o contraseña incorrectos');
+                        // ❌ Credenciales incorrectas
+                        this.showError(data.error || 'Credenciales incorrectas');
                     }
                     
                 } catch (error) {
@@ -614,6 +630,10 @@
                     });
                 });
                 
+                // Botón de logout explícito
+                document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
+                
+                // También el avatar (opcional)
                 document.getElementById('userAvatar').addEventListener('click', () => this.logout());
             },
             
@@ -1135,8 +1155,6 @@
                         this.login();
                     }
                 });
-                
-                this.setupReportes();
             },
             
             mostrarNotificacion(mensaje) {
