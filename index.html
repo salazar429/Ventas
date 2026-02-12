@@ -60,15 +60,17 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* ===== ESTADO DEL SERVIDOR - CORREGIDO ===== */
         .connection-status {
             position: fixed;
-            top: 10px;
+            top: 70px;  /* Bajado para que no se superponga con el header */
             right: 15px;
             padding: 0.5rem 1rem;
             border-radius: var(--border-radius);
             font-size: 0.8rem;
             font-weight: 600;
-            z-index: 200;
+            z-index: 150;  /* Menor que el header */
             box-shadow: var(--box-shadow);
         }
         .connection-status.online {
@@ -79,6 +81,7 @@
             background: var(--danger-color);
             color: white;
         }
+        
         .page-section {
             display: none;
         }
@@ -143,10 +146,15 @@
             display: flex;
             align-items: center;
         }
+        
+        /* Eliminar cualquier duplicado de información de vendedora */
+        .vendedora-info-card {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <!-- Estado del servidor -->
+    <!-- Estado del servidor - AHORA MÁS ABAJO -->
     <div id="serverStatus" class="connection-status online">
         🔍 Verificando conexión...
     </div>
@@ -293,18 +301,8 @@
                     </div>
                 </div>
 
-                <!-- Información de la vendedora -->
-                <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-size: 1.1rem; font-weight: 600;" id="usuarioInfoNombre">Cargando...</div>
-                            <div style="font-size: 0.85rem; opacity: 0.9;" id="usuarioInfoTienda"></div>
-                        </div>
-                        <div class="avatar" style="background: var(--accent-color); width: 50px; height: 50px; font-size: 1.3rem; cursor: default;" id="usuarioInfoAvatar">
-                            V
-                        </div>
-                    </div>
-                </div>
+                <!-- ===== ELIMINADA LA TARJETA DE INFORMACIÓN DE VENDEDORA ===== -->
+                <!-- Ya no se muestra aquí, solo en el header -->
 
                 <!-- Productos disponibles -->
                 <h2 class="section-title">
@@ -506,7 +504,7 @@
         // APP VENDEDORA - LOGIN REAL CON EL SERVIDOR
         // ===========================================
         
-        const API_URL = 'https://sistema-test-api.onrender.com'; // TU URL DE RENDER
+        const API_URL = 'https://sistema-test-api.onrender.com';
         
         const App = {
             usuario: null,
@@ -560,7 +558,6 @@
                 }
             },
             
-            // ========== LOGIN CORREGIDO - USA EL ENDPOINT REAL ==========
             async login() {
                 const usuario = document.getElementById('usuario').value.trim();
                 const password = document.getElementById('password').value;
@@ -575,7 +572,6 @@
                 btn.textContent = '🔐 Verificando...';
                 
                 try {
-                    // ✅ Usar el endpoint REAL de login que está en el servidor
                     const response = await fetch(`${API_URL}/api/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -585,7 +581,6 @@
                     const data = await response.json();
                     
                     if (response.ok && data.success) {
-                        // ✅ Login exitoso con el servidor
                         this.usuario = data.usuario;
                         localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
                         
@@ -597,7 +592,6 @@
                         
                         this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
                     } else {
-                        // ❌ Credenciales incorrectas
                         this.showError(data.error || 'Credenciales incorrectas');
                     }
                     
@@ -630,10 +624,7 @@
                     });
                 });
                 
-                // Botón de logout explícito
                 document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
-                
-                // También el avatar (opcional)
                 document.getElementById('userAvatar').addEventListener('click', () => this.logout());
             },
             
@@ -656,8 +647,6 @@
                     this.cargarInventario();
                 } else if (page === 'sales') {
                     this.cargarTodasLasVentas();
-                } else if (page === 'dashboard') {
-                    this.actualizarDashboard();
                 }
             },
             
@@ -1142,9 +1131,7 @@
                 
                 document.getElementById('userName').textContent = this.usuario.nombre || 'Vendedora';
                 document.getElementById('userAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
-                document.getElementById('usuarioInfoNombre').textContent = this.usuario.nombre || 'Vendedora';
-                document.getElementById('usuarioInfoTienda').textContent = this.usuario.tienda || 'Tienda General';
-                document.getElementById('usuarioInfoAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
+                // Ya no actualizamos la tarjeta eliminada
             },
             
             setupEventListeners() {
