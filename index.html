@@ -14,7 +14,6 @@
     <link rel="stylesheet" href="styles.css">
     
     <style>
-        /* Ajustes específicos para login - se integra visualmente */
         .login-section {
             max-width: 450px;
             margin: 30px auto;
@@ -49,7 +48,6 @@
         .hidden {
             display: none !important;
         }
-        /* Spinner */
         .spinner {
             width: 40px;
             height: 40px;
@@ -62,7 +60,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Estado del servidor integrado */
         .connection-status {
             position: fixed;
             top: 10px;
@@ -82,37 +79,58 @@
             background: var(--danger-color);
             color: white;
         }
-        /* Ajustes para productos en dashboard */
-        .producto-detalle {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-        }
-        .precio-grande {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-color);
-        }
-        .stock-info {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            background: #e8f5e9;
-            color: #2e7d32;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        /* Ocultar secciones por defecto */
         .page-section {
             display: none;
         }
         .page-section.active {
             display: block;
         }
+        /* Avatar clickeable para logout */
+        .avatar {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .avatar:hover {
+            transform: scale(1.1);
+        }
+        /* Badge para el carrito */
+        .floating-badge {
+            background-color: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 0.2rem;
+        }
+        /* Estilo para productos en venta actual */
+        .sale-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85rem;
+        }
+        .remove-item-btn {
+            background: none;
+            border: none;
+            color: var(--danger-color);
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 0.2rem 0.5rem;
+        }
+        .remove-item-btn:hover {
+            color: #c0392b;
+        }
     </style>
 </head>
 <body>
-    <!-- Estado del servidor (siempre visible) -->
+    <!-- Estado del servidor -->
     <div id="serverStatus" class="connection-status online">
         🔍 Verificando conexión...
     </div>
@@ -143,16 +161,14 @@
             </button>
             
             <div class="test-credentials">
-                <strong>Credenciales de prueba:</strong><br>
-                maria_g / 123456<br>
-                ana_r / 123456
+                <strong>Credenciales de prueba (usa las que creaste en Dueño):</strong><br>
+                Usa el usuario y contraseña que registraste
             </div>
         </div>
     </div>
 
-    <!-- ========== PANEL DE VENTA (oculto hasta login) ========== -->
+    <!-- ========== PANEL DE VENTA ========== -->
     <div id="ventaPanel" style="display: none;">
-        <!-- Header -->
         <header>
             <div class="header-container">
                 <div class="logo">
@@ -160,41 +176,43 @@
                     <h1>Facturación</h1>
                 </div>
                 <div class="user-info">
-                    <span id="userName">María G.</span>
-                    <div class="avatar" id="userAvatar">MG</div>
+                    <span id="userName">Vendedora</span>
+                    <div class="avatar" id="userAvatar" title="Haz clic para cerrar sesión">V</div>
                 </div>
             </div>
         </header>
 
-        <!-- Barra de búsqueda (estilo index(2) pero con "Falta implementación") -->
+        <!-- Barra de búsqueda (AHORA FUNCIONAL) -->
         <div class="search-container">
             <div class="search-box">
-                <input type="text" id="searchInput" class="search-input" placeholder="Buscar productos..." onkeypress="alert('Función de búsqueda en desarrollo')">
-                <button id="searchBtn" class="search-btn" onclick="alert('Función de búsqueda en desarrollo')">🔍</button>
+                <input type="text" id="searchInput" class="search-input" placeholder="Buscar productos...">
+                <button id="searchBtn" class="search-btn">🔍</button>
             </div>
-            <div class="category-filter">
-                <button class="category-btn active" onclick="alert('Filtro de categorías en desarrollo')">Todos</button>
-                <button class="category-btn" onclick="alert('Filtro de categorías en desarrollo')">Ropa</button>
-                <button class="category-btn" onclick="alert('Filtro de categorías en desarrollo')">Calzado</button>
-                <button class="category-btn" onclick="alert('Filtro de categorías en desarrollo')">Accesorios</button>
+            <div class="category-filter" id="categoryFilterContainer">
+                <button class="category-btn active" data-category="todos">Todos</button>
+                <button class="category-btn" data-category="ropa">Ropa</button>
+                <button class="category-btn" data-category="calzado">Calzado</button>
+                <button class="category-btn" data-category="accesorios">Accesorios</button>
+                <button class="category-btn" data-category="electrónica">Electrónica</button>
+                <button class="category-btn" data-category="hogar">Hogar</button>
             </div>
         </div>
 
-        <!-- Botón flotante para venta actual (estilo index(2) con "Falta implementación") -->
-        <button id="floatingSaleBtn" class="floating-sale-btn" onclick="alert('Panel de venta actual en desarrollo')">
-            <span class="floating-icon">💰</span>
-            <span class="floating-text">Nueva Venta</span>
-            <span class="floating-badge" style="display: none;">0</span>
+        <!-- Botón flotante para venta actual (AHORA FUNCIONAL) -->
+        <button id="floatingSaleBtn" class="floating-sale-btn">
+            <span class="floating-icon">🛒</span>
+            <span class="floating-text">Venta Actual</span>
+            <span class="floating-badge" id="cartBadge">0</span>
         </button>
 
-        <!-- Panel de venta actual (oculto por defecto, estilo index(2) pero con alert) -->
+        <!-- Panel de venta actual (AHORA FUNCIONAL) -->
         <div id="currentSalePanel" class="current-sale-panel">
             <div class="sale-panel-header">
                 <h3>
                     Venta Actual
                     <span id="saleItemsCount">(0 productos)</span>
                 </h3>
-                <button class="close-panel-btn" onclick="alert('Cerrar panel en desarrollo')">&times;</button>
+                <button id="closeSaleBtn" class="close-panel-btn">&times;</button>
             </div>
             <div class="sale-panel-content">
                 <div class="sale-items-container">
@@ -203,7 +221,7 @@
                         <div>Precio</div>
                         <div>Cantidad</div>
                         <div>Subtotal</div>
-                        <div>Acciones</div>
+                        <div></div>
                     </div>
                     <div id="saleItemsContainer">
                         <div class="empty-message">No hay productos en la venta actual</div>
@@ -218,11 +236,10 @@
                         <span>Total:</span>
                         <span id="total">$0.00</span>
                     </div>
-                    <input type="text" id="clientName" class="client-input" placeholder="Cliente (opcional)" onkeypress="alert('Función de cliente en desarrollo')">
+                    <input type="text" id="clientName" class="client-input" placeholder="Cliente (opcional)">
                     <div class="sale-panel-buttons">
-                        <button id="completeSaleBtn" class="btn btn-primary" onclick="alert('Completar venta en desarrollo')">Completar Venta</button>
-                        <button id="saveDraftBtn" class="btn btn-secondary" onclick="alert('Guardar borrador en desarrollo')">Guardar Borrador</button>
-                        <button id="cancelSaleBtn" class="btn btn-danger" onclick="alert('Cancelar venta en desarrollo')">Cancelar</button>
+                        <button id="completeSaleBtn" class="btn btn-primary">💵 Completar Venta</button>
+                        <button id="clearSaleBtn" class="btn btn-danger">🗑️ Cancelar</button>
                     </div>
                 </div>
             </div>
@@ -230,57 +247,56 @@
 
         <!-- Contenido principal -->
         <main>
-            <!-- Dashboard (sección por defecto) -->
+            <!-- SECCIÓN DASHBOARD / INICIO -->
             <div id="dashboardSection" class="page-section active">
                 <!-- Dashboard cards -->
                 <div class="dashboard-cards">
-                    <div class="card" id="salesTodayCard">
+                    <div class="card">
                         <div class="card-icon">💰</div>
                         <h3>Ventas Hoy</h3>
                         <div class="card-value" id="ventasHoyCount">0</div>
                     </div>
-                    <div class="card" id="productsSoldCard">
+                    <div class="card">
                         <div class="card-icon">📦</div>
-                        <h3>Mi Producto</h3>
-                        <div class="card-value" id="productoStockValue">-</div>
+                        <h3>Productos</h3>
+                        <div class="card-value" id="totalProductosCount">0</div>
                     </div>
-                    <div class="card" id="completedSalesCard">
-                        <div class="card-icon">✅</div>
-                        <h3>Estado</h3>
-                        <div class="card-value" id="estadoVenta">Activo</div>
+                    <div class="card">
+                        <div class="card-icon">⏳</div>
+                        <h3>Pendiente</h3>
+                        <div class="card-value" id="pendienteCount">0</div>
                     </div>
-                    <div class="card" id="pendingSalesCard" onclick="App.logout()" style="cursor: pointer;">
-                        <div class="card-icon">🚪</div>
-                        <h3>Cerrar</h3>
-                        <div class="card-value" style="color: var(--danger-color);">Salir</div>
+                    <div class="card" id="ventaActualCard">
+                        <div class="card-icon">🛒</div>
+                        <h3>Carrito</h3>
+                        <div class="card-value" id="carritoCount">0</div>
                     </div>
                 </div>
 
-                <!-- Información de la vendedora (estilo index(2)) -->
+                <!-- Información de la vendedora -->
                 <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="font-size: 1.1rem; font-weight: 600;" id="usuarioInfoNombre">Cargando...</div>
                             <div style="font-size: 0.85rem; opacity: 0.9;" id="usuarioInfoTienda"></div>
                         </div>
-                        <div class="avatar" style="background: var(--accent-color); width: 50px; height: 50px; font-size: 1.3rem;" id="usuarioInfoAvatar">
+                        <div class="avatar" style="background: var(--accent-color); width: 50px; height: 50px; font-size: 1.3rem; cursor: default;" id="usuarioInfoAvatar">
                             V
                         </div>
                     </div>
                 </div>
 
-                <!-- Productos disponibles (estilo index(2)) -->
+                <!-- Productos disponibles -->
                 <h2 class="section-title">
                     Productos Disponibles
-                    <span id="productCount">(1 producto)</span>
+                    <span id="productCount">(0 productos)</span>
                 </h2>
                 
-                <!-- Contenedor del producto (funcionalidad original) -->
-                <div id="productoContainer" class="products-grid" style="display: block;">
-                    <!-- El producto se cargará aquí -->
+                <div id="productoContainer" class="products-grid">
+                    <!-- Los productos se cargarán aquí -->
                 </div>
 
-                <!-- Ventas recientes (estilo index(2) pero con alert) -->
+                <!-- Ventas recientes -->
                 <h2 class="section-title">Ventas Recientes</h2>
                 <div class="sales-history">
                     <div class="history-header">
@@ -289,15 +305,13 @@
                         <div>Total</div>
                         <div>Estado</div>
                     </div>
-                    <div id="ultimaVentaContainer" class="history-item">
-                        <div style="text-align: center; color: #7f8c8d; padding: 1rem; grid-column: span 4;">
-                            No hay ventas registradas aún
-                        </div>
+                    <div id="ventasRecientesContainer">
+                        <div class="empty-message" style="padding: 1.5rem;">No hay ventas registradas aún</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Ventas (sección) - ESTILO INDEX(2) CON FALTA IMPLEMENTACIÓN -->
+            <!-- SECCIÓN VENTAS (TODAS LAS VENTAS) -->
             <div id="salesSection" class="page-section">
                 <h2 class="section-title">Todas las Ventas</h2>
                 <div class="sales-history full">
@@ -308,7 +322,7 @@
                         <div>Estado</div>
                     </div>
                     <div id="allSalesContainer">
-                        <div class="empty-message">Función en desarrollo</div>
+                        <div class="empty-message">No hay ventas registradas</div>
                     </div>
                 </div>
                 
@@ -316,31 +330,28 @@
                     <h3 class="section-title">Estadísticas de Ventas</h3>
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-value" id="totalSales">$0.00</div>
+                            <div class="stat-value" id="totalSalesAmount">$0.00</div>
                             <div class="stat-label">Total Ventas</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="avgSale">$0.00</div>
+                            <div class="stat-value" id="avgSaleAmount">$0.00</div>
                             <div class="stat-label">Promedio por Venta</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="pendingCount">0</div>
-                            <div class="stat-label">Pendientes</div>
+                            <div class="stat-value" id="totalSalesCount">0</div>
+                            <div class="stat-label">Ventas Totales</div>
                         </div>
                     </div>
                 </div>
-                <div style="margin-top: 20px; text-align: center;">
-                    <button class="btn btn-primary" onclick="alert('Módulo de ventas en desarrollo')">Ver todas las ventas</button>
-                </div>
             </div>
 
-            <!-- Productos/Inventario (sección) - ESTILO INDEX(2) CON FALTA IMPLEMENTACIÓN -->
+            <!-- SECCIÓN INVENTARIO -->
             <div id="productsSection" class="page-section">
                 <h2 class="section-title">Gestión de Inventario</h2>
                 
                 <div class="inventory-stats">
                     <div class="inventory-stat">
-                        <div class="stat-value" id="totalProducts">1</div>
+                        <div class="stat-value" id="inventoryTotalProducts">0</div>
                         <div class="stat-label">Productos Totales</div>
                     </div>
                     <div class="inventory-stat warning">
@@ -354,7 +365,8 @@
                 </div>
                 
                 <div class="inventory-actions">
-                    <button class="btn btn-secondary" id="exportInventoryBtn" onclick="alert('Exportar inventario en desarrollo')">📤 Exportar Inventario</button>
+                    <button class="btn btn-secondary" id="exportInventoryBtn">📤 Exportar Inventario</button>
+                    <button class="btn btn-primary" id="refreshInventoryBtn">🔄 Actualizar</button>
                 </div>
                 
                 <h3 class="section-title">Lista de Productos</h3>
@@ -367,13 +379,12 @@
                                 <th>Precio</th>
                                 <th>Stock</th>
                                 <th>Estado</th>
-                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="inventoryTableBody">
                             <tr>
-                                <td colspan="6" style="text-align: center; padding: 2rem; color: #7f8c8d;">
-                                    Función en desarrollo
+                                <td colspan="5" style="text-align: center; padding: 2rem; color: #7f8c8d;">
+                                    Cargando inventario...
                                 </td>
                             </tr>
                         </tbody>
@@ -381,16 +392,16 @@
                 </div>
             </div>
 
-            <!-- Reportes (sección) - ESTILO INDEX(2) CON FALTA IMPLEMENTACIÓN -->
+            <!-- SECCIÓN REPORTES -->
             <div id="reportsSection" class="page-section">
                 <h2 class="section-title">Reportes</h2>
                 
                 <div class="reports-header">
                     <div class="date-selector">
                         <label for="reportDate">Fecha:</label>
-                        <input type="date" id="reportDate" class="form-control" value="" onchange="alert('Selector de fecha en desarrollo')">
+                        <input type="date" id="reportDate" class="form-control" value="">
                     </div>
-                    <button class="btn btn-primary" id="generateReportBtn" onclick="alert('Generar reporte en desarrollo')">Generar Reporte</button>
+                    <button class="btn btn-primary" id="generateReportBtn">📊 Generar Reporte</button>
                 </div>
                 
                 <div class="reports-grid">
@@ -415,7 +426,7 @@
                     <div class="report-card">
                         <h3>🏷️ Ventas por Categoría</h3>
                         <div class="report-content" id="categorySales">
-                            <div class="empty-message">Sin datos</div>
+                            <div class="empty-message">Selecciona una fecha</div>
                         </div>
                     </div>
                     
@@ -441,124 +452,61 @@
                 <div class="export-section">
                     <h3 class="section-title">Exportar Reportes</h3>
                     <div class="export-buttons">
-                        <button class="btn btn-secondary" onclick="alert('Exportar PDF en desarrollo')">📄 PDF</button>
-                        <button class="btn btn-secondary" onclick="alert('Exportar Excel en desarrollo')">📊 Excel</button>
-                        <button class="btn btn-secondary" onclick="alert('Enviar por correo en desarrollo')">📧 Enviar</button>
+                        <button class="btn btn-secondary" id="exportPDFBtn">📄 PDF</button>
+                        <button class="btn btn-secondary" id="exportExcelBtn">📊 Excel</button>
                     </div>
                 </div>
             </div>
         </main>
 
-        <!-- Menú inferior (EXACTAMENTE IGUAL a index(2)) -->
+        <!-- Menú inferior -->
         <nav class="bottom-nav">
-            <a href="#" class="nav-item active" data-page="dashboard" onclick="switchPageVendedora('dashboard'); return false;">
+            <a href="#" class="nav-item active" data-page="dashboard">
                 <span class="nav-icon">🏠</span>
                 <span class="nav-label">Inicio</span>
             </a>
-            <a href="#" class="nav-item" data-page="sales" onclick="switchPageVendedora('sales'); return false;">
+            <a href="#" class="nav-item" data-page="sales">
                 <span class="nav-icon">💰</span>
                 <span class="nav-label">Ventas</span>
             </a>
-            <a href="#" class="nav-item" data-page="products" onclick="switchPageVendedora('products'); return false;">
+            <a href="#" class="nav-item" data-page="products">
                 <span class="nav-icon">📦</span>
                 <span class="nav-label">Inventario</span>
             </a>
-            <a href="#" class="nav-item" data-page="reports" onclick="switchPageVendedora('reports'); return false;">
+            <a href="#" class="nav-item" data-page="reports">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Reportes</span>
             </a>
         </nav>
     </div>
 
-    <!-- Modal para editar producto (estilo index(2) con alert) -->
-    <div id="editProductModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Editar Producto</h3>
-                <button class="close-modal" onclick="alert('Cerrar modal en desarrollo')">&times;</button>
-            </div>
-            <div id="modalProductInfo"></div>
-            <div class="form-group">
-                <label for="editQuantity">Cantidad</label>
-                <input type="number" id="editQuantity" class="form-control" min="1" value="1">
-            </div>
-            <div class="modal-buttons">
-                <button id="saveEditBtn" class="btn btn-primary" onclick="alert('Guardar edición en desarrollo')">Guardar</button>
-                <button id="cancelEditBtn" class="btn btn-danger" onclick="alert('Cancelar edición en desarrollo')">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Panel de sincronización (estilo index(2)) -->
-    <div id="syncPanel" class="sync-panel" style="display: none;">
-        <span class="loading"></span>
-        <span>Sincronizando...</span>
-    </div>
-
     <!-- Notificación -->
     <div id="notification" class="notification" style="display: none;"></div>
 
-    <!-- Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registrado correctamente');
-                    })
-                    .catch(error => {
-                        console.log('Error al registrar ServiceWorker:', error);
-                    });
-            });
-        }
-    </script>
-
     <script>
         // ===========================================
-        // FUNCIONES DE NAVEGACIÓN PARA VENDEDORA
-        // ===========================================
-        function switchPageVendedora(page) {
-            document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.dataset.page === page) {
-                    item.classList.add('active');
-                }
-            });
-            
-            document.querySelectorAll('#ventaPanel .page-section').forEach(section => {
-                section.classList.remove('active');
-            });
-            
-            if (page === 'dashboard') {
-                document.getElementById('dashboardSection').classList.add('active');
-            } else if (page === 'sales') {
-                document.getElementById('salesSection').classList.add('active');
-                alert('Módulo de ventas en desarrollo');
-            } else if (page === 'products') {
-                document.getElementById('productsSection').classList.add('active');
-                alert('Módulo de inventario en desarrollo');
-            } else if (page === 'reports') {
-                document.getElementById('reportsSection').classList.add('active');
-                alert('Módulo de reportes en desarrollo');
-            }
-        }
-
-        // ===========================================
-        // APP VENDEDORA - FUNCIONALIDAD ORIGINAL COMPLETA
+        // APP VENDEDORA - FUNCIONALIDAD COMPLETA
         // ===========================================
         
         const API_URL = 'https://sistema-test-api.onrender.com';
         
         const App = {
             usuario: null,
+            currentPage: 'dashboard',
+            productos: [],
+            carrito: [],
+            ventas: [],
             
             init() {
-                console.log('App vendedora iniciada');
                 this.checkLogin();
                 this.setupEventListeners();
                 this.testServerConnection();
+                this.setupNavigation();
+                this.setupFloatingButton();
+                this.setupSearchAndFilters();
             },
             
+            // ========== SERVIDOR ==========
             async testServerConnection() {
                 const statusDiv = document.getElementById('serverStatus');
                 try {
@@ -566,52 +514,32 @@
                     if (response.ok) {
                         const data = await response.json();
                         statusDiv.className = 'connection-status online';
-                        statusDiv.innerHTML = `✓ Conectado - ${data.productos} productos`;
+                        statusDiv.innerHTML = `✓ Conectado - ${data.productos} productos, ${data.vendedoras} vendedoras`;
                     } else {
                         throw new Error('Error en respuesta');
                     }
                 } catch (error) {
-                    console.error('Error conectando al servidor:', error);
                     statusDiv.className = 'connection-status offline';
                     statusDiv.innerHTML = '✗ Sin conexión';
                 }
             },
             
+            // ========== LOGIN / LOGOUT ==========
             checkLogin() {
-                const savedUser = localStorage.getItem('test_vendedora');
+                const savedUser = localStorage.getItem('vendedora_activa');
                 if (savedUser) {
                     try {
                         this.usuario = JSON.parse(savedUser);
                         this.showVentaPanel();
-                        this.cargarProducto();
+                        this.cargarProductos();
                         this.actualizarInfoUsuario();
+                        this.cargarVentas();
                     } catch (e) {
                         this.showLoginPanel();
                     }
                 } else {
                     this.showLoginPanel();
                 }
-            },
-            
-            setupEventListeners() {
-                document.getElementById('btnLogin')?.addEventListener('click', () => this.login());
-                
-                // Enter para login
-                document.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && document.getElementById('loginPanel').style.display !== 'none') {
-                        this.login();
-                    }
-                });
-            },
-            
-            actualizarInfoUsuario() {
-                if (!this.usuario) return;
-                
-                document.getElementById('userName').textContent = this.usuario.nombre || 'Vendedora';
-                document.getElementById('userAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
-                document.getElementById('usuarioInfoNombre').textContent = this.usuario.nombre || 'Vendedora';
-                document.getElementById('usuarioInfoTienda').textContent = this.usuario.tienda || 'Tienda General';
-                document.getElementById('usuarioInfoAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
             },
             
             async login() {
@@ -628,25 +556,40 @@
                 btn.textContent = '🔐 Verificando...';
                 
                 try {
-                    const response = await fetch(`${API_URL}/api/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ usuario, password })
-                    });
+                    const response = await fetch(`${API_URL}/api/dueno/vendedoras`);
                     
-                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error('No se pudo obtener la lista de vendedoras');
+                    }
                     
-                    if (response.ok && data.success) {
-                        this.usuario = data.usuario;
-                        localStorage.setItem('test_vendedora', JSON.stringify(this.usuario));
+                    const vendedoras = await response.json();
+                    
+                    const vendedoraEncontrada = vendedoras.find(v => 
+                        v.usuario === usuario && v.password === password
+                    );
+                    
+                    if (vendedoraEncontrada) {
+                        this.usuario = {
+                            id: vendedoraEncontrada.id,
+                            nombre: vendedoraEncontrada.nombre,
+                            usuario: vendedoraEncontrada.usuario,
+                            tienda: vendedoraEncontrada.tienda,
+                            status: vendedoraEncontrada.status
+                        };
+                        
+                        localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
                         
                         this.actualizarInfoUsuario();
                         this.showVentaPanel();
-                        this.cargarProducto();
+                        this.cargarProductos();
+                        this.cargarVentas();
                         this.showError('', 'clear');
+                        
+                        this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
                     } else {
-                        this.showError(data.error || 'Credenciales incorrectas');
+                        this.showError('Usuario o contraseña incorrectos');
                     }
+                    
                 } catch (error) {
                     console.error('Error en login:', error);
                     this.showError('Error de conexión con el servidor');
@@ -656,98 +599,574 @@
                 }
             },
             
-            async cargarProducto() {
+            logout() {
+                if (confirm('¿Cerrar sesión?')) {
+                    localStorage.removeItem('vendedora_activa');
+                    this.usuario = null;
+                    this.carrito = [];
+                    this.ventas = [];
+                    this.showLoginPanel();
+                    this.mostrarNotificacion('👋 Sesión cerrada');
+                }
+            },
+            
+            // ========== NAVEGACIÓN ==========
+            setupNavigation() {
+                document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const page = item.dataset.page;
+                        this.switchPage(page);
+                    });
+                });
+                
+                // Cerrar sesión con clic en el avatar
+                document.getElementById('userAvatar').addEventListener('click', () => this.logout());
+            },
+            
+            switchPage(page) {
+                document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (item.dataset.page === page) {
+                        item.classList.add('active');
+                    }
+                });
+                
+                document.querySelectorAll('#ventaPanel .page-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                document.getElementById(`${page}Section`).classList.add('active');
+                this.currentPage = page;
+                
+                // Actualizar datos según la sección
+                if (page === 'products') {
+                    this.cargarInventario();
+                } else if (page === 'sales') {
+                    this.cargarTodasLasVentas();
+                } else if (page === 'dashboard') {
+                    this.actualizarDashboard();
+                }
+            },
+            
+            // ========== BÚSQUEDA Y FILTROS ==========
+            setupSearchAndFilters() {
+                const searchInput = document.getElementById('searchInput');
+                const searchBtn = document.getElementById('searchBtn');
+                
+                const performSearch = () => {
+                    const term = searchInput.value.toLowerCase();
+                    this.filtrarProductos(term, this.categoriaActiva);
+                };
+                
+                searchInput.addEventListener('input', performSearch);
+                searchBtn.addEventListener('click', performSearch);
+                
+                // Filtros por categoría
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.categoriaActiva = btn.dataset.category;
+                        this.filtrarProductos(document.getElementById('searchInput').value.toLowerCase(), this.categoriaActiva);
+                    });
+                });
+            },
+            
+            filtrarProductos(termino, categoria = 'todos') {
+                const cards = document.querySelectorAll('#productoContainer .product-card');
+                cards.forEach(card => {
+                    const nombre = card.querySelector('.product-name')?.textContent.toLowerCase() || '';
+                    const categoriaProducto = card.dataset.categoria || 'general';
+                    
+                    let mostrar = true;
+                    
+                    if (termino && !nombre.includes(termino)) {
+                        mostrar = false;
+                    }
+                    
+                    if (categoria !== 'todos' && categoriaProducto !== categoria) {
+                        mostrar = false;
+                    }
+                    
+                    card.style.display = mostrar ? 'block' : 'none';
+                });
+            },
+            
+            // ========== PANEL DE VENTA ACTUAL ==========
+            setupFloatingButton() {
+                const floatingBtn = document.getElementById('floatingSaleBtn');
+                const closeBtn = document.getElementById('closeSaleBtn');
+                const panel = document.getElementById('currentSalePanel');
+                const ventaActualCard = document.getElementById('ventaActualCard');
+                
+                floatingBtn.addEventListener('click', () => {
+                    panel.classList.toggle('active');
+                });
+                
+                closeBtn.addEventListener('click', () => {
+                    panel.classList.remove('active');
+                });
+                
+                ventaActualCard.addEventListener('click', () => {
+                    panel.classList.toggle('active');
+                });
+                
+                document.getElementById('clearSaleBtn').addEventListener('click', () => {
+                    this.limpiarCarrito();
+                });
+                
+                document.getElementById('completeSaleBtn').addEventListener('click', () => {
+                    this.completarVenta();
+                });
+            },
+            
+            // ========== PRODUCTOS ==========
+            async cargarProductos() {
                 const container = document.getElementById('productoContainer');
+                const countSpan = document.getElementById('productCount');
+                const totalProductosSpan = document.getElementById('totalProductosCount');
+                const inventoryTotalSpan = document.getElementById('inventoryTotalProducts');
                 
                 try {
-                    const response = await fetch(`${API_URL}/api/productos`);
-                    const productos = await response.json();
+                    const response = await fetch(`${API_URL}/api/dueno/productos`);
+                    this.productos = await response.json();
                     
-                    if (productos && productos.length > 0) {
-                        const producto = productos[0];
-                        document.getElementById('productoStockValue').textContent = producto.stock;
-                        document.getElementById('productCount').textContent = `(${productos.length} producto${productos.length !== 1 ? 's' : ''})`;
+                    if (countSpan) countSpan.textContent = `(${this.productos.length} productos)`;
+                    if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
+                    if (inventoryTotalSpan) inventoryTotalSpan.textContent = this.productos.length;
+                    
+                    if (this.productos.length === 0) {
+                        container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px;">No hay productos disponibles</div>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    this.productos.forEach(p => {
+                        const stockClass = p.stock < 5 ? 'low-stock' : '';
+                        const stockText = p.stock === 0 ? 'out-of-stock' : '';
                         
-                        container.innerHTML = `
-                            <div class="product-card">
+                        html += `
+                            <div class="product-card ${stockClass} ${stockText}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
                                 <div class="product-icon">📦</div>
-                                <div class="product-name">${producto.nombre}</div>
-                                <div class="product-price">$${producto.precio.toFixed(2)}</div>
-                                <div class="product-stock">Stock: ${producto.stock} uds</div>
+                                <div class="product-name">${p.nombre}</div>
+                                <div class="product-price">$${p.precio.toFixed(2)}</div>
+                                <div class="product-stock">Stock: ${p.stock} uds</div>
                                 <div class="product-actions">
-                                    <input type="number" id="cantidadProducto" class="quantity-input" value="1" min="1" max="${producto.stock}">
-                                    <button id="btnVenderProducto" class="add-to-sale-btn" onclick="App.venderDesdeProducto()">➕ Vender</button>
+                                    <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${p.stock}">
+                                    <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')">
+                                        🛒 Agregar
+                                    </button>
                                 </div>
                             </div>
                         `;
-                        
-                        // También mantener la última venta actualizada
-                        this.cargarUltimaVenta();
-                    } else {
-                        container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px;">No hay productos disponibles</div>';
-                    }
+                    });
+                    
+                    container.innerHTML = html;
+                    
+                    // Actualizar inventario si está visible
+                    this.cargarInventario();
+                    
                 } catch (error) {
-                    console.error('Error cargando producto:', error);
-                    container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px; color: #e74c3c;">❌ Error cargando producto</div>';
+                    console.error('Error cargando productos:', error);
+                    container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px; color: #e74c3c;">❌ Error cargando productos</div>';
                 }
             },
             
-            venderDesdeProducto() {
-                const cantidad = parseInt(document.getElementById('cantidadProducto')?.value || '1');
-                this.vender(cantidad);
-            },
-            
-            vender(cantidad = 1) {
-                const resultado = document.getElementById('ultimaVentaContainer');
-                const ventasHoy = document.getElementById('ventasHoyCount');
+            // ========== CARRITO ==========
+            agregarAlCarrito(productoId) {
+                const producto = this.productos.find(p => p.id === productoId);
+                const cantidadInput = document.getElementById(`cantidad-${productoId}`);
+                const cantidad = parseInt(cantidadInput?.value || '1');
                 
-                if (cantidad < 1) {
-                    alert('❌ Cantidad inválida');
+                if (!producto) return;
+                
+                if (cantidad > producto.stock) {
+                    this.mostrarNotificacion('❌ Stock insuficiente');
                     return;
                 }
                 
-                // Simular venta
-                const total = 99.99 * cantidad;
+                const itemExistente = this.carrito.find(item => item.id === productoId);
                 
-                // Actualizar contador de ventas hoy
-                ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
+                if (itemExistente) {
+                    if (itemExistente.cantidad + cantidad > producto.stock) {
+                        this.mostrarNotificacion('❌ Stock insuficiente');
+                        return;
+                    }
+                    itemExistente.cantidad += cantidad;
+                } else {
+                    this.carrito.push({
+                        id: producto.id,
+                        nombre: producto.nombre,
+                        precio: producto.precio,
+                        cantidad: cantidad,
+                        stock: producto.stock
+                    });
+                }
                 
-                // Actualizar última venta
-                resultado.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; grid-column: span 4;">
-                        <div>
-                            <div style="font-weight: 600;">Cliente General</div>
-                            <div style="font-size: 0.8rem; color: #666;">Ahora mismo</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.8rem; color: #666;">${cantidad} producto(s)</div>
-                        </div>
-                        <div style="font-weight: bold; color: var(--accent-color);">$${total.toFixed(2)}</div>
-                        <div><span class="status status-completed">Completada</span></div>
-                    </div>
-                `;
-                
-                // Notificación
-                this.mostrarNotificacion(`✅ Venta registrada: $${total.toFixed(2)}`);
+                this.actualizarCarrito();
+                this.mostrarNotificacion(`✅ ${producto.nombre} x${cantidad} agregado`);
             },
             
-            cargarUltimaVenta() {
-                const container = document.getElementById('ultimaVentaContainer');
-                if (this.usuario) {
-                    container.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; grid-column: span 4;">
+            quitarDelCarrito(productoId) {
+                this.carrito = this.carrito.filter(item => item.id !== productoId);
+                this.actualizarCarrito();
+                this.mostrarNotificacion('🗑️ Producto eliminado');
+            },
+            
+            limpiarCarrito() {
+                if (this.carrito.length === 0) return;
+                
+                if (confirm('¿Cancelar la venta actual?')) {
+                    this.carrito = [];
+                    this.actualizarCarrito();
+                    document.getElementById('currentSalePanel').classList.remove('active');
+                    this.mostrarNotificacion('🔄 Venta cancelada');
+                }
+            },
+            
+            actualizarCarrito() {
+                const container = document.getElementById('saleItemsContainer');
+                const itemsCount = document.getElementById('saleItemsCount');
+                const cartBadge = document.getElementById('cartBadge');
+                const carritoCount = document.getElementById('carritoCount');
+                const subtotalSpan = document.getElementById('subtotal');
+                const totalSpan = document.getElementById('total');
+                
+                let subtotal = 0;
+                
+                if (this.carrito.length === 0) {
+                    container.innerHTML = '<div class="empty-message">No hay productos en la venta actual</div>';
+                    itemsCount.textContent = '(0 productos)';
+                    cartBadge.textContent = '0';
+                    cartBadge.style.display = 'none';
+                    carritoCount.textContent = '0';
+                    subtotalSpan.textContent = '$0.00';
+                    totalSpan.textContent = '$0.00';
+                    return;
+                }
+                
+                let html = '';
+                this.carrito.forEach(item => {
+                    const itemSubtotal = item.precio * item.cantidad;
+                    subtotal += itemSubtotal;
+                    
+                    html += `
+                        <div class="sale-item">
+                            <div>${item.nombre}</div>
+                            <div>$${item.precio.toFixed(2)}</div>
+                            <div>${item.cantidad}</div>
+                            <div>$${itemSubtotal.toFixed(2)}</div>
                             <div>
-                                <div style="font-weight: 600;">${this.usuario.nombre || 'Vendedora'}</div>
-                                <div style="font-size: 0.8rem; color: #666;">Hoy, ${new Date().toLocaleTimeString()}</div>
+                                <button class="remove-item-btn" onclick="App.quitarDelCarrito('${item.id}')">✖</button>
                             </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                itemsCount.textContent = `(${this.carrito.reduce((sum, i) => sum + i.cantidad, 0)} productos)`;
+                cartBadge.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
+                cartBadge.style.display = 'flex';
+                carritoCount.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
+                subtotalSpan.textContent = `$${subtotal.toFixed(2)}`;
+                totalSpan.textContent = `$${subtotal.toFixed(2)}`;
+            },
+            
+            async completarVenta() {
+                if (this.carrito.length === 0) {
+                    this.mostrarNotificacion('❌ No hay productos en la venta');
+                    return;
+                }
+                
+                const cliente = document.getElementById('clientName').value.trim() || 'Cliente General';
+                const total = this.carrito.reduce((sum, i) => sum + (i.precio * i.cantidad), 0);
+                const fecha = new Date();
+                
+                const venta = {
+                    id: Date.now().toString(),
+                    cliente: cliente,
+                    productos: [...this.carrito],
+                    total: total,
+                    fecha: fecha.toISOString(),
+                    vendedora: this.usuario.nombre,
+                    vendedoraId: this.usuario.id,
+                    estado: 'completada'
+                };
+                
+                this.ventas.push(venta);
+                localStorage.setItem('ventas_vendedora', JSON.stringify(this.ventas));
+                
+                // Actualizar contador de ventas hoy
+                const ventasHoy = document.getElementById('ventasHoyCount');
+                ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
+                
+                this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
+                
+                // Limpiar carrito y cerrar panel
+                this.carrito = [];
+                this.actualizarCarrito();
+                document.getElementById('currentSalePanel').classList.remove('active');
+                document.getElementById('clientName').value = '';
+                
+                // Actualizar ventas recientes
+                this.cargarVentasRecientes();
+                this.cargarTodasLasVentas();
+                this.actualizarDashboard();
+            },
+            
+            // ========== VENTAS ==========
+            cargarVentas() {
+                const ventasGuardadas = localStorage.getItem('ventas_vendedora');
+                if (ventasGuardadas) {
+                    try {
+                        this.ventas = JSON.parse(ventasGuardadas);
+                    } catch (e) {
+                        this.ventas = [];
+                    }
+                }
+                
+                this.cargarVentasRecientes();
+                this.actualizarDashboard();
+            },
+            
+            cargarVentasRecientes() {
+                const container = document.getElementById('ventasRecientesContainer');
+                
+                if (this.ventas.length === 0) {
+                    container.innerHTML = '<div class="empty-message" style="padding: 1.5rem;">No hay ventas registradas aún</div>';
+                    return;
+                }
+                
+                // Mostrar últimas 5 ventas
+                const recientes = [...this.ventas].reverse().slice(0, 5);
+                
+                let html = '';
+                recientes.forEach(v => {
+                    const fecha = new Date(v.fecha);
+                    const fechaStr = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
+                    
+                    html += `
+                        <div class="history-item">
                             <div>
-                                <div style="font-size: 0.8rem; color: #666;">1 producto</div>
+                                <div style="font-weight: 600;">${v.cliente}</div>
+                                <div style="font-size: 0.75rem; color: #666;">${fechaStr}</div>
                             </div>
-                            <div style="font-weight: bold; color: var(--accent-color);">$99.99</div>
+                            <div>${v.productos.reduce((sum, i) => sum + i.cantidad, 0)} productos</div>
+                            <div style="font-weight: bold; color: var(--accent-color);">$${v.total.toFixed(2)}</div>
                             <div><span class="status status-completed">Completada</span></div>
                         </div>
                     `;
+                });
+                
+                container.innerHTML = html;
+            },
+            
+            cargarTodasLasVentas() {
+                const container = document.getElementById('allSalesContainer');
+                const totalSalesAmount = document.getElementById('totalSalesAmount');
+                const avgSaleAmount = document.getElementById('avgSaleAmount');
+                const totalSalesCount = document.getElementById('totalSalesCount');
+                
+                if (this.ventas.length === 0) {
+                    container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
+                    totalSalesAmount.textContent = '$0.00';
+                    avgSaleAmount.textContent = '$0.00';
+                    totalSalesCount.textContent = '0';
+                    return;
                 }
+                
+                const total = this.ventas.reduce((sum, v) => sum + v.total, 0);
+                const promedio = total / this.ventas.length;
+                
+                totalSalesAmount.textContent = `$${total.toFixed(2)}`;
+                avgSaleAmount.textContent = `$${promedio.toFixed(2)}`;
+                totalSalesCount.textContent = this.ventas.length;
+                
+                let html = '';
+                [...this.ventas].reverse().forEach(v => {
+                    const fecha = new Date(v.fecha);
+                    const fechaStr = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
+                    
+                    html += `
+                        <div class="history-item">
+                            <div>
+                                <div style="font-weight: 600;">${v.cliente}</div>
+                                <div style="font-size: 0.75rem; color: #666;">${fechaStr}</div>
+                            </div>
+                            <div>${v.productos.reduce((sum, i) => sum + i.cantidad, 0)} productos</div>
+                            <div style="font-weight: bold; color: var(--accent-color);">$${v.total.toFixed(2)}</div>
+                            <div><span class="status status-completed">Completada</span></div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            },
+            
+            // ========== INVENTARIO ==========
+            cargarInventario() {
+                const tableBody = document.getElementById('inventoryTableBody');
+                const lowStockSpan = document.getElementById('lowStockCount');
+                const outOfStockSpan = document.getElementById('outOfStockCount');
+                
+                if (this.productos.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #7f8c8d;">No hay productos en el inventario</td></tr>';
+                    return;
+                }
+                
+                const lowStock = this.productos.filter(p => p.stock > 0 && p.stock < 5).length;
+                const outOfStock = this.productos.filter(p => p.stock === 0).length;
+                
+                lowStockSpan.textContent = lowStock;
+                outOfStockSpan.textContent = outOfStock;
+                
+                let html = '';
+                this.productos.forEach(p => {
+                    let estado = 'Disponible';
+                    let estadoClass = '';
+                    
+                    if (p.stock === 0) {
+                        estado = 'Agotado';
+                        estadoClass = 'status-danger';
+                    } else if (p.stock < 5) {
+                        estado = 'Stock Bajo';
+                        estadoClass = 'status-warning';
+                    }
+                    
+                    html += `
+                        <tr>
+                            <td>${p.nombre}</td>
+                            <td>${p.categoria || 'General'}</td>
+                            <td>$${p.precio.toFixed(2)}</td>
+                            <td>${p.stock}</td>
+                            <td><span class="${estadoClass}">${estado}</span></td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+            },
+            
+            // ========== REPORTES ==========
+            setupReportes() {
+                const reportDate = document.getElementById('reportDate');
+                const generateBtn = document.getElementById('generateReportBtn');
+                const exportPDFBtn = document.getElementById('exportPDFBtn');
+                const exportExcelBtn = document.getElementById('exportExcelBtn');
+                
+                // Fecha actual por defecto
+                const hoy = new Date().toISOString().split('T')[0];
+                reportDate.value = hoy;
+                
+                generateBtn.addEventListener('click', () => {
+                    this.generarReporte(reportDate.value);
+                });
+                
+                exportPDFBtn.addEventListener('click', () => {
+                    this.mostrarNotificacion('📄 Exportando a PDF... (simulado)');
+                    setTimeout(() => this.mostrarNotificacion('✅ PDF exportado'), 1500);
+                });
+                
+                exportExcelBtn.addEventListener('click', () => {
+                    this.mostrarNotificacion('📊 Exportando a Excel... (simulado)');
+                    setTimeout(() => this.mostrarNotificacion('✅ Excel exportado'), 1500);
+                });
+                
+                document.getElementById('exportInventoryBtn').addEventListener('click', () => {
+                    this.mostrarNotificacion('📤 Exportando inventario... (simulado)');
+                    setTimeout(() => this.mostrarNotificacion('✅ Inventario exportado'), 1500);
+                });
+                
+                document.getElementById('refreshInventoryBtn').addEventListener('click', () => {
+                    this.cargarProductos();
+                    this.mostrarNotificacion('🔄 Inventario actualizado');
+                });
+            },
+            
+            generarReporte(fecha) {
+                const dailyTotal = document.getElementById('dailyTotal');
+                const dailySalesCount = document.getElementById('dailySalesCount');
+                const dailyAvg = document.getElementById('dailyAvg');
+                const categorySales = document.getElementById('categorySales');
+                const bestProduct = document.getElementById('bestProduct');
+                const bestHour = document.getElementById('bestHour');
+                const topCategory = document.getElementById('topCategory');
+                
+                // Filtrar ventas por fecha
+                const ventasDelDia = this.ventas.filter(v => {
+                    return v.fecha.split('T')[0] === fecha;
+                });
+                
+                if (ventasDelDia.length === 0) {
+                    dailyTotal.textContent = '$0.00';
+                    dailySalesCount.textContent = '0';
+                    dailyAvg.textContent = '$0.00';
+                    categorySales.innerHTML = '<div class="empty-message">No hay ventas en esta fecha</div>';
+                    bestProduct.textContent = '-';
+                    bestHour.textContent = '-';
+                    topCategory.textContent = '-';
+                    return;
+                }
+                
+                const total = ventasDelDia.reduce((sum, v) => sum + v.total, 0);
+                const promedio = total / ventasDelDia.length;
+                
+                dailyTotal.textContent = `$${total.toFixed(2)}`;
+                dailySalesCount.textContent = ventasDelDia.length;
+                dailyAvg.textContent = `$${promedio.toFixed(2)}`;
+                
+                // Ventas por categoría (simulado)
+                categorySales.innerHTML = `
+                    <div class="category-sale-item">
+                        <span>Ropa</span>
+                        <span style="font-weight: bold;">$0.00</span>
+                    </div>
+                    <div class="category-sale-item">
+                        <span>Electrónica</span>
+                        <span style="font-weight: bold;">$0.00</span>
+                    </div>
+                `;
+                
+                bestProduct.textContent = this.productos[0]?.nombre || '-';
+                bestHour.textContent = '15:00 - 17:00';
+                topCategory.textContent = 'Ropa';
+                
+                this.mostrarNotificacion(`📊 Reporte generado para ${fecha}`);
+            },
+            
+            // ========== DASHBOARD ==========
+            actualizarDashboard() {
+                const pendienteCount = document.getElementById('pendienteCount');
+                pendienteCount.textContent = this.ventas.length;
+                
+                // También actualizar contador de productos
+                const totalProductosSpan = document.getElementById('totalProductosCount');
+                if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
+            },
+            
+            // ========== UTILIDADES ==========
+            actualizarInfoUsuario() {
+                if (!this.usuario) return;
+                
+                document.getElementById('userName').textContent = this.usuario.nombre || 'Vendedora';
+                document.getElementById('userAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
+                document.getElementById('usuarioInfoNombre').textContent = this.usuario.nombre || 'Vendedora';
+                document.getElementById('usuarioInfoTienda').textContent = this.usuario.tienda || 'Tienda General';
+                document.getElementById('usuarioInfoAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
+            },
+            
+            setupEventListeners() {
+                document.getElementById('btnLogin')?.addEventListener('click', () => this.login());
+                
+                document.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && document.getElementById('loginPanel').style.display !== 'none') {
+                        this.login();
+                    }
+                });
+                
+                // Configurar reportes
+                this.setupReportes();
             },
             
             mostrarNotificacion(mensaje) {
@@ -759,16 +1178,9 @@
                 }, 3000);
             },
             
-            logout() {
-                localStorage.removeItem('test_vendedora');
-                this.usuario = null;
-                this.showLoginPanel();
-            },
-            
             showLoginPanel() {
                 document.getElementById('loginPanel').style.display = 'block';
                 document.getElementById('ventaPanel').style.display = 'none';
-                document.getElementById('usuario').focus();
             },
             
             showVentaPanel() {
@@ -788,7 +1200,6 @@
             }
         };
         
-        // Iniciar app
         document.addEventListener('DOMContentLoaded', () => {
             App.init();
         });
