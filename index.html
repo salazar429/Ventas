@@ -3,18 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vendedora - Sistema de Facturación</title>
-    <meta name="description" content="Sistema de facturación para vendedoras">
+    <title>Vendedora - Sistema de Facturación PWA</title>
+    <meta name="description" content="Sistema de facturación PWA para vendedoras móviles">
     <meta name="theme-color" content="#2c3e50">
     
-    <!-- Estilos profesionales -->
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Hojas de estilo -->
     <link rel="stylesheet" href="styles.css">
     
     <style>
-        /* Ajustes específicos para login */
-        .login-container {
+        /* Ajustes específicos para login - se integra visualmente */
+        .login-section {
             max-width: 450px;
-            margin: 0 auto;
+            margin: 30px auto;
+            padding: 0 15px;
+        }
+        .login-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--box-shadow);
         }
         .login-header {
             text-align: center;
@@ -29,47 +39,12 @@
             font-size: 1.5rem;
             margin-top: 0.5rem;
         }
-        .login-card {
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 2rem;
-            box-shadow: var(--box-shadow);
-        }
         .test-credentials {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid #eee;
             font-size: 0.85rem;
             color: #666;
-        }
-        .test-credentials strong {
-            color: var(--primary-color);
-        }
-        .producto-detalle {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            margin-top: 1rem;
-        }
-        .precio-grande {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-color);
-        }
-        .stock-info {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            background: #e8f5e9;
-            color: #2e7d32;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        .venta-rapida {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border-radius: var(--border-radius);
-            padding: 1.5rem;
-            margin-top: 1.5rem;
         }
         .hidden {
             display: none !important;
@@ -87,7 +62,7 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Estado del servidor */
+        /* Estado del servidor integrado */
         .connection-status {
             position: fixed;
             top: 10px;
@@ -107,91 +82,181 @@
             background: var(--danger-color);
             color: white;
         }
+        /* Ajustes para productos en dashboard */
+        .producto-detalle {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+        }
+        .precio-grande {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        .stock-info {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        /* Ocultar secciones por defecto */
+        .page-section {
+            display: none;
+        }
+        .page-section.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <!-- Header (visible solo cuando está logueado) -->
-    <header id="mainHeader" style="display: none;">
-        <div class="header-container">
-            <div class="logo">
-                <span>📊</span>
-                <h1>Facturación</h1>
-            </div>
-            <div class="user-info">
-                <span id="userName">Vendedora</span>
-                <div class="avatar" id="userAvatar">V</div>
-            </div>
-        </div>
-    </header>
-
     <!-- Estado del servidor (siempre visible) -->
     <div id="serverStatus" class="connection-status online">
         🔍 Verificando conexión...
     </div>
 
-    <!-- Contenido principal -->
-    <main>
-        <!-- ========== PANEL DE LOGIN ========== -->
-        <div id="loginPanel" class="login-container" style="margin-top: 30px;">
-            <div class="login-header">
-                <div class="logo-icon">👗</div>
-                <h1>Sistema de Facturación</h1>
-                <p style="color: #666; margin-top: 0.5rem;">Inicia sesión para continuar</p>
+    <!-- ========== PANEL DE LOGIN ========== -->
+    <div id="loginPanel" class="login-section">
+        <div class="login-header">
+            <div class="logo-icon">👗</div>
+            <h1>Sistema de Facturación</h1>
+            <p style="color: #666; margin-top: 0.5rem;">Inicia sesión para continuar</p>
+        </div>
+        
+        <div class="login-card">
+            <div id="loginError" style="background: #f8d7da; color: #721c24; padding: 0.8rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; display: none;"></div>
+            
+            <div class="form-group">
+                <label>Usuario</label>
+                <input type="text" id="usuario" class="form-control" placeholder="Ej: maria_g" value="maria_g">
             </div>
             
-            <div class="login-card">
-                <div id="loginError" style="background: #f8d7da; color: #721c24; padding: 0.8rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; display: none;"></div>
-                
-                <div class="form-group">
-                    <label>Usuario</label>
-                    <input type="text" id="usuario" class="form-control" placeholder="Ej: maria_g" value="maria_g">
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" id="password" class="form-control" placeholder="••••••" value="123456">
+            </div>
+            
+            <button id="btnLogin" class="btn btn-primary" style="width: 100%; padding: 0.8rem; font-size: 1rem;">
+                🔑 Iniciar Sesión
+            </button>
+            
+            <div class="test-credentials">
+                <strong>Credenciales de prueba:</strong><br>
+                maria_g / 123456<br>
+                ana_r / 123456
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== PANEL DE VENTA (oculto hasta login) ========== -->
+    <div id="ventaPanel" style="display: none;">
+        <!-- Header -->
+        <header>
+            <div class="header-container">
+                <div class="logo">
+                    <span>📊</span>
+                    <h1>Facturación</h1>
                 </div>
-                
-                <div class="form-group">
-                    <label>Contraseña</label>
-                    <input type="password" id="password" class="form-control" placeholder="••••••" value="123456">
+                <div class="user-info">
+                    <span id="userName">María G.</span>
+                    <div class="avatar" id="userAvatar">MG</div>
                 </div>
-                
-                <button id="btnLogin" class="btn btn-primary" style="width: 100%; padding: 0.8rem; font-size: 1rem;">
-                    🔑 Iniciar Sesión
-                </button>
-                
-                <div class="test-credentials">
-                    <strong>Credenciales de prueba:</strong><br>
-                    maria_g / 123456<br>
-                    ana_r / 123456
+            </div>
+        </header>
+
+        <!-- Barra de búsqueda (estilo index(2) pero con "Falta implementación") -->
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="Buscar productos..." onkeypress="alert('Función de búsqueda en desarrollo')">
+                <button id="searchBtn" class="search-btn" onclick="alert('Función de búsqueda en desarrollo')">🔍</button>
+            </div>
+            <div class="category-filter">
+                <button class="category-btn active" onclick="alert('Filtro de categorías en desarrollo')">Todos</button>
+                <button class="category-btn" onclick="alert('Filtro de categorías en desarrollo')">Ropa</button>
+                <button class="category-btn" onclick="alert('Filtro de categorías en desarrollo')">Calzado</button>
+                <button class="category-btn" onclick="alert('Filtro de categorías en desarrollo')">Accesorios</button>
+            </div>
+        </div>
+
+        <!-- Botón flotante para venta actual (estilo index(2) con "Falta implementación") -->
+        <button id="floatingSaleBtn" class="floating-sale-btn" onclick="alert('Panel de venta actual en desarrollo')">
+            <span class="floating-icon">💰</span>
+            <span class="floating-text">Nueva Venta</span>
+            <span class="floating-badge" style="display: none;">0</span>
+        </button>
+
+        <!-- Panel de venta actual (oculto por defecto, estilo index(2) pero con alert) -->
+        <div id="currentSalePanel" class="current-sale-panel">
+            <div class="sale-panel-header">
+                <h3>
+                    Venta Actual
+                    <span id="saleItemsCount">(0 productos)</span>
+                </h3>
+                <button class="close-panel-btn" onclick="alert('Cerrar panel en desarrollo')">&times;</button>
+            </div>
+            <div class="sale-panel-content">
+                <div class="sale-items-container">
+                    <div class="sale-header">
+                        <div>Producto</div>
+                        <div>Precio</div>
+                        <div>Cantidad</div>
+                        <div>Subtotal</div>
+                        <div>Acciones</div>
+                    </div>
+                    <div id="saleItemsContainer">
+                        <div class="empty-message">No hay productos en la venta actual</div>
+                    </div>
+                </div>
+                <div class="sale-panel-summary">
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">$0.00</span>
+                    </div>
+                    <div class="summary-row summary-total">
+                        <span>Total:</span>
+                        <span id="total">$0.00</span>
+                    </div>
+                    <input type="text" id="clientName" class="client-input" placeholder="Cliente (opcional)" onkeypress="alert('Función de cliente en desarrollo')">
+                    <div class="sale-panel-buttons">
+                        <button id="completeSaleBtn" class="btn btn-primary" onclick="alert('Completar venta en desarrollo')">Completar Venta</button>
+                        <button id="saveDraftBtn" class="btn btn-secondary" onclick="alert('Guardar borrador en desarrollo')">Guardar Borrador</button>
+                        <button id="cancelSaleBtn" class="btn btn-danger" onclick="alert('Cancelar venta en desarrollo')">Cancelar</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- ========== PANEL DE VENTA (oculto hasta login) ========== -->
-        <div id="ventaPanel" style="display: none;">
-            <!-- Dashboard / Producto y venta -->
+        <!-- Contenido principal -->
+        <main>
+            <!-- Dashboard (sección por defecto) -->
             <div id="dashboardSection" class="page-section active">
+                <!-- Dashboard cards -->
                 <div class="dashboard-cards">
-                    <div class="card" id="ventasHoyCard">
+                    <div class="card" id="salesTodayCard">
                         <div class="card-icon">💰</div>
                         <h3>Ventas Hoy</h3>
                         <div class="card-value" id="ventasHoyCount">0</div>
                     </div>
-                    <div class="card" id="productosCard">
+                    <div class="card" id="productsSoldCard">
                         <div class="card-icon">📦</div>
                         <h3>Mi Producto</h3>
                         <div class="card-value" id="productoStockValue">-</div>
                     </div>
-                    <div class="card" id="estadoCard">
-                        <div class="card-icon">🛒</div>
+                    <div class="card" id="completedSalesCard">
+                        <div class="card-icon">✅</div>
                         <h3>Estado</h3>
                         <div class="card-value" id="estadoVenta">Activo</div>
                     </div>
-                    <div class="card" id="logoutCard" onclick="App.logout()" style="cursor: pointer;">
+                    <div class="card" id="pendingSalesCard" onclick="App.logout()" style="cursor: pointer;">
                         <div class="card-icon">🚪</div>
                         <h3>Cerrar</h3>
                         <div class="card-value" style="color: var(--danger-color);">Salir</div>
                     </div>
                 </div>
 
-                <!-- Información de la vendedora -->
+                <!-- Información de la vendedora (estilo index(2)) -->
                 <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--dark-color)); color: white; margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
@@ -204,68 +269,285 @@
                     </div>
                 </div>
 
-                <!-- Producto disponible -->
+                <!-- Productos disponibles (estilo index(2)) -->
                 <h2 class="section-title">
-                    📦 Producto Disponible
-                    <span id="productoNombreBadge"></span>
+                    Productos Disponibles
+                    <span id="productCount">(1 producto)</span>
                 </h2>
                 
-                <div class="card" id="productoContainer">
-                    <div style="text-align: center; padding: 40px;">
-                        <div class="spinner" style="display: inline-block;"></div>
-                        <p style="margin-top: 10px; color: #7f8c8d;">Cargando producto...</p>
-                    </div>
+                <!-- Contenedor del producto (funcionalidad original) -->
+                <div id="productoContainer" class="products-grid" style="display: block;">
+                    <!-- El producto se cargará aquí -->
                 </div>
 
-                <!-- Venta rápida -->
-                <div class="venta-rapida">
-                    <h3 style="color: var(--primary-color); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <span>🛒</span> Venta Rápida
-                    </h3>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <div style="width: 100px;">
-                            <label style="font-size: 0.8rem; color: #666;">Cantidad</label>
-                            <input type="number" id="cantidad" value="1" min="1" max="100" class="form-control" style="text-align: center;">
-                        </div>
-                        <div style="flex: 1;">
-                            <label style="font-size: 0.8rem; color: #666;">Cliente (opcional)</label>
-                            <input type="text" id="clienteVenta" class="form-control" placeholder="Nombre del cliente">
-                        </div>
+                <!-- Ventas recientes (estilo index(2) pero con alert) -->
+                <h2 class="section-title">Ventas Recientes</h2>
+                <div class="sales-history">
+                    <div class="history-header">
+                        <div>Cliente / Fecha</div>
+                        <div>Productos</div>
+                        <div>Total</div>
+                        <div>Estado</div>
                     </div>
-                    <button id="btnVender" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.8rem;">
-                        💰 Completar Venta
-                    </button>
-                    <div id="ventaResultado" style="margin-top: 1rem; display: none; padding: 0.8rem; border-radius: var(--border-radius);"></div>
-                </div>
-
-                <!-- Última venta (placeholder) -->
-                <div style="margin-top: 1.5rem;">
-                    <h3 class="section-title">📋 Última Venta</h3>
-                    <div id="ultimaVentaContainer" class="card" style="background: #f8f9fa;">
-                        <div style="text-align: center; color: #7f8c8d; padding: 1rem;">
+                    <div id="ultimaVentaContainer" class="history-item">
+                        <div style="text-align: center; color: #7f8c8d; padding: 1rem; grid-column: span 4;">
                             No hay ventas registradas aún
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
 
-    <!-- Botón flotante para cerrar sesión rápido (visible solo cuando está logueado) -->
-    <button id="floatingLogoutBtn" class="floating-sale-btn" style="background: var(--danger-color); bottom: 20px; display: none;" onclick="App.logout()">
-        <span class="floating-icon">🚪</span>
-        <span class="floating-text">Cerrar Sesión</span>
-    </button>
+            <!-- Ventas (sección) - ESTILO INDEX(2) CON FALTA IMPLEMENTACIÓN -->
+            <div id="salesSection" class="page-section">
+                <h2 class="section-title">Todas las Ventas</h2>
+                <div class="sales-history full">
+                    <div class="history-header">
+                        <div>Cliente / Fecha</div>
+                        <div>Productos</div>
+                        <div>Total</div>
+                        <div>Estado</div>
+                    </div>
+                    <div id="allSalesContainer">
+                        <div class="empty-message">Función en desarrollo</div>
+                    </div>
+                </div>
+                
+                <div class="stats-container">
+                    <h3 class="section-title">Estadísticas de Ventas</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalSales">$0.00</div>
+                            <div class="stat-label">Total Ventas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="avgSale">$0.00</div>
+                            <div class="stat-label">Promedio por Venta</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="pendingCount">0</div>
+                            <div class="stat-label">Pendientes</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn btn-primary" onclick="alert('Módulo de ventas en desarrollo')">Ver todas las ventas</button>
+                </div>
+            </div>
+
+            <!-- Productos/Inventario (sección) - ESTILO INDEX(2) CON FALTA IMPLEMENTACIÓN -->
+            <div id="productsSection" class="page-section">
+                <h2 class="section-title">Gestión de Inventario</h2>
+                
+                <div class="inventory-stats">
+                    <div class="inventory-stat">
+                        <div class="stat-value" id="totalProducts">1</div>
+                        <div class="stat-label">Productos Totales</div>
+                    </div>
+                    <div class="inventory-stat warning">
+                        <div class="stat-value" id="lowStockCount">0</div>
+                        <div class="stat-label">Stock Bajo</div>
+                    </div>
+                    <div class="inventory-stat danger">
+                        <div class="stat-value" id="outOfStockCount">0</div>
+                        <div class="stat-label">Agotados</div>
+                    </div>
+                </div>
+                
+                <div class="inventory-actions">
+                    <button class="btn btn-secondary" id="exportInventoryBtn" onclick="alert('Exportar inventario en desarrollo')">📤 Exportar Inventario</button>
+                </div>
+                
+                <h3 class="section-title">Lista de Productos</h3>
+                <div class="inventory-table-container">
+                    <table class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>Stock</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem; color: #7f8c8d;">
+                                    Función en desarrollo
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Reportes (sección) - ESTILO INDEX(2) CON FALTA IMPLEMENTACIÓN -->
+            <div id="reportsSection" class="page-section">
+                <h2 class="section-title">Reportes</h2>
+                
+                <div class="reports-header">
+                    <div class="date-selector">
+                        <label for="reportDate">Fecha:</label>
+                        <input type="date" id="reportDate" class="form-control" value="" onchange="alert('Selector de fecha en desarrollo')">
+                    </div>
+                    <button class="btn btn-primary" id="generateReportBtn" onclick="alert('Generar reporte en desarrollo')">Generar Reporte</button>
+                </div>
+                
+                <div class="reports-grid">
+                    <div class="report-card">
+                        <h3>📊 Ventas del Día</h3>
+                        <div class="report-content">
+                            <div class="report-stat">
+                                <span>Total:</span>
+                                <span id="dailyTotal">$0.00</span>
+                            </div>
+                            <div class="report-stat">
+                                <span>Ventas:</span>
+                                <span id="dailySalesCount">0</span>
+                            </div>
+                            <div class="report-stat">
+                                <span>Promedio:</span>
+                                <span id="dailyAvg">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card">
+                        <h3>🏷️ Ventas por Categoría</h3>
+                        <div class="report-content" id="categorySales">
+                            <div class="empty-message">Sin datos</div>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card">
+                        <h3>📈 Tendencias</h3>
+                        <div class="report-content">
+                            <div class="trend-item">
+                                <span>Mejor Producto:</span>
+                                <span id="bestProduct">-</span>
+                            </div>
+                            <div class="trend-item">
+                                <span>Mejor Hora:</span>
+                                <span id="bestHour">-</span>
+                            </div>
+                            <div class="trend-item">
+                                <span>Categoría Top:</span>
+                                <span id="topCategory">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="export-section">
+                    <h3 class="section-title">Exportar Reportes</h3>
+                    <div class="export-buttons">
+                        <button class="btn btn-secondary" onclick="alert('Exportar PDF en desarrollo')">📄 PDF</button>
+                        <button class="btn btn-secondary" onclick="alert('Exportar Excel en desarrollo')">📊 Excel</button>
+                        <button class="btn btn-secondary" onclick="alert('Enviar por correo en desarrollo')">📧 Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Menú inferior (EXACTAMENTE IGUAL a index(2)) -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item active" data-page="dashboard" onclick="switchPageVendedora('dashboard'); return false;">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Inicio</span>
+            </a>
+            <a href="#" class="nav-item" data-page="sales" onclick="switchPageVendedora('sales'); return false;">
+                <span class="nav-icon">💰</span>
+                <span class="nav-label">Ventas</span>
+            </a>
+            <a href="#" class="nav-item" data-page="products" onclick="switchPageVendedora('products'); return false;">
+                <span class="nav-icon">📦</span>
+                <span class="nav-label">Inventario</span>
+            </a>
+            <a href="#" class="nav-item" data-page="reports" onclick="switchPageVendedora('reports'); return false;">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Reportes</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Modal para editar producto (estilo index(2) con alert) -->
+    <div id="editProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Editar Producto</h3>
+                <button class="close-modal" onclick="alert('Cerrar modal en desarrollo')">&times;</button>
+            </div>
+            <div id="modalProductInfo"></div>
+            <div class="form-group">
+                <label for="editQuantity">Cantidad</label>
+                <input type="number" id="editQuantity" class="form-control" min="1" value="1">
+            </div>
+            <div class="modal-buttons">
+                <button id="saveEditBtn" class="btn btn-primary" onclick="alert('Guardar edición en desarrollo')">Guardar</button>
+                <button id="cancelEditBtn" class="btn btn-danger" onclick="alert('Cancelar edición en desarrollo')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de sincronización (estilo index(2)) -->
+    <div id="syncPanel" class="sync-panel" style="display: none;">
+        <span class="loading"></span>
+        <span>Sincronizando...</span>
+    </div>
 
     <!-- Notificación -->
     <div id="notification" class="notification" style="display: none;"></div>
 
+    <!-- Service Worker Registration -->
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registrado correctamente');
+                    })
+                    .catch(error => {
+                        console.log('Error al registrar ServiceWorker:', error);
+                    });
+            });
+        }
+    </script>
+
+    <script>
+        // ===========================================
+        // FUNCIONES DE NAVEGACIÓN PARA VENDEDORA
+        // ===========================================
+        function switchPageVendedora(page) {
+            document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.page === page) {
+                    item.classList.add('active');
+                }
+            });
+            
+            document.querySelectorAll('#ventaPanel .page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            if (page === 'dashboard') {
+                document.getElementById('dashboardSection').classList.add('active');
+            } else if (page === 'sales') {
+                document.getElementById('salesSection').classList.add('active');
+                alert('Módulo de ventas en desarrollo');
+            } else if (page === 'products') {
+                document.getElementById('productsSection').classList.add('active');
+                alert('Módulo de inventario en desarrollo');
+            } else if (page === 'reports') {
+                document.getElementById('reportsSection').classList.add('active');
+                alert('Módulo de reportes en desarrollo');
+            }
+        }
+
         // ===========================================
         // APP VENDEDORA - FUNCIONALIDAD ORIGINAL COMPLETA
         // ===========================================
         
-        const API_URL = 'https://sistema-test-api.onrender.com'; // TU URL DE RENDER
+        const API_URL = 'https://sistema-test-api.onrender.com';
         
         const App = {
             usuario: null,
@@ -313,7 +595,6 @@
             
             setupEventListeners() {
                 document.getElementById('btnLogin')?.addEventListener('click', () => this.login());
-                document.getElementById('btnVender')?.addEventListener('click', () => this.vender());
                 
                 // Enter para login
                 document.addEventListener('keypress', (e) => {
@@ -385,108 +666,96 @@
                     if (productos && productos.length > 0) {
                         const producto = productos[0];
                         document.getElementById('productoStockValue').textContent = producto.stock;
-                        document.getElementById('productoNombreBadge').textContent = producto.nombre;
+                        document.getElementById('productCount').textContent = `(${productos.length} producto${productos.length !== 1 ? 's' : ''})`;
                         
                         container.innerHTML = `
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div style="font-size: 1.3rem; font-weight: 600; color: var(--primary-color);">
-                                            ${producto.nombre}
-                                        </div>
-                                        <div style="margin-top: 0.3rem; color: #666; font-size: 0.9rem;">
-                                            ID: ${producto.id} • ${producto.categoria || 'General'}
-                                        </div>
-                                    </div>
-                                    <span class="stock-info">
-                                        Stock: ${producto.stock} unidades
-                                    </span>
-                                </div>
-                                <div class="precio-grande">
-                                    $${producto.precio.toFixed(2)}
+                            <div class="product-card">
+                                <div class="product-icon">📦</div>
+                                <div class="product-name">${producto.nombre}</div>
+                                <div class="product-price">$${producto.precio.toFixed(2)}</div>
+                                <div class="product-stock">Stock: ${producto.stock} uds</div>
+                                <div class="product-actions">
+                                    <input type="number" id="cantidadProducto" class="quantity-input" value="1" min="1" max="${producto.stock}">
+                                    <button id="btnVenderProducto" class="add-to-sale-btn" onclick="App.venderDesdeProducto()">➕ Vender</button>
                                 </div>
                             </div>
                         `;
                         
-                        // Actualizar última venta (simulada)
+                        // También mantener la última venta actualizada
                         this.cargarUltimaVenta();
                     } else {
-                        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;">No hay productos disponibles</div>';
+                        container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px;">No hay productos disponibles</div>';
                     }
                 } catch (error) {
                     console.error('Error cargando producto:', error);
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 30px; color: #e74c3c;">
-                            ❌ Error cargando producto del servidor
-                        </div>
-                    `;
+                    container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px; color: #e74c3c;">❌ Error cargando producto</div>';
                 }
             },
             
-            cargarUltimaVenta() {
-                // Simulación de última venta
-                const container = document.getElementById('ultimaVentaContainer');
-                if (this.usuario) {
-                    container.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 600;">${this.usuario.nombre || 'Vendedora'}</div>
-                                <div style="font-size: 0.8rem; color: #666;">Hoy, ${new Date().toLocaleTimeString()}</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-weight: bold; color: var(--accent-color);">$99.99</div>
-                                <div style="font-size: 0.8rem; color: #666;">1 producto</div>
-                            </div>
-                        </div>
-                    `;
-                }
+            venderDesdeProducto() {
+                const cantidad = parseInt(document.getElementById('cantidadProducto')?.value || '1');
+                this.vender(cantidad);
             },
             
-            vender() {
-                const cantidad = parseInt(document.getElementById('cantidad').value);
-                const cliente = document.getElementById('clienteVenta')?.value || 'Cliente General';
-                const resultado = document.getElementById('ventaResultado');
+            vender(cantidad = 1) {
+                const resultado = document.getElementById('ultimaVentaContainer');
+                const ventasHoy = document.getElementById('ventasHoyCount');
                 
                 if (cantidad < 1) {
-                    resultado.style.display = 'block';
-                    resultado.style.background = '#f8d7da';
-                    resultado.style.color = '#721c24';
-                    resultado.innerHTML = '❌ Cantidad inválida';
+                    alert('❌ Cantidad inválida');
                     return;
                 }
                 
                 // Simular venta
                 const total = 99.99 * cantidad;
                 
-                resultado.style.display = 'block';
-                resultado.style.background = '#d4edda';
-                resultado.style.color = '#155724';
-                resultado.innerHTML = `
-                    ✅ Venta registrada exitosamente<br>
-                    <small>Cliente: ${cliente} - $${total.toFixed(2)}</small>
-                `;
-                
                 // Actualizar contador de ventas hoy
-                const ventasHoy = document.getElementById('ventasHoyCount');
                 ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
                 
                 // Actualizar última venta
-                const container = document.getElementById('ultimaVentaContainer');
-                container.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                resultado.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; grid-column: span 4;">
                         <div>
-                            <div style="font-weight: 600;">${cliente}</div>
+                            <div style="font-weight: 600;">Cliente General</div>
                             <div style="font-size: 0.8rem; color: #666;">Ahora mismo</div>
                         </div>
-                        <div style="text-align: right;">
-                            <div style="font-weight: bold; color: var(--accent-color);">$${total.toFixed(2)}</div>
-                            <div style="font-size: 0.8rem; color: #666;">${cantidad} ${cantidad === 1 ? 'producto' : 'productos'}</div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #666;">${cantidad} producto(s)</div>
                         </div>
+                        <div style="font-weight: bold; color: var(--accent-color);">$${total.toFixed(2)}</div>
+                        <div><span class="status status-completed">Completada</span></div>
                     </div>
                 `;
                 
+                // Notificación
+                this.mostrarNotificacion(`✅ Venta registrada: $${total.toFixed(2)}`);
+            },
+            
+            cargarUltimaVenta() {
+                const container = document.getElementById('ultimaVentaContainer');
+                if (this.usuario) {
+                    container.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; grid-column: span 4;">
+                            <div>
+                                <div style="font-weight: 600;">${this.usuario.nombre || 'Vendedora'}</div>
+                                <div style="font-size: 0.8rem; color: #666;">Hoy, ${new Date().toLocaleTimeString()}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.8rem; color: #666;">1 producto</div>
+                            </div>
+                            <div style="font-weight: bold; color: var(--accent-color);">$99.99</div>
+                            <div><span class="status status-completed">Completada</span></div>
+                        </div>
+                    `;
+                }
+            },
+            
+            mostrarNotificacion(mensaje) {
+                const notif = document.getElementById('notification');
+                notif.style.display = 'block';
+                notif.textContent = mensaje;
                 setTimeout(() => {
-                    resultado.style.display = 'none';
+                    notif.style.display = 'none';
                 }, 3000);
             },
             
@@ -499,16 +768,12 @@
             showLoginPanel() {
                 document.getElementById('loginPanel').style.display = 'block';
                 document.getElementById('ventaPanel').style.display = 'none';
-                document.getElementById('mainHeader').style.display = 'none';
-                document.getElementById('floatingLogoutBtn').style.display = 'none';
                 document.getElementById('usuario').focus();
             },
             
             showVentaPanel() {
                 document.getElementById('loginPanel').style.display = 'none';
                 document.getElementById('ventaPanel').style.display = 'block';
-                document.getElementById('mainHeader').style.display = 'block';
-                document.getElementById('floatingLogoutBtn').style.display = 'flex';
             },
             
             showError(message, type = 'error') {
