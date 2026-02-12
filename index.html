@@ -3,41 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vendedora - Sistema de Facturación PWA</title>
-    <meta name="description" content="Sistema de facturación PWA para vendedoras móviles">
+    <title>Facturación Vendedoras</title>
+    <meta name="description" content="Sistema de facturación PWA para vendedoras">
     <meta name="theme-color" content="#2c3e50">
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     
+    <!-- Iconos para Apple -->
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
     <!-- Hojas de estilo -->
     <link rel="stylesheet" href="styles.css">
     
     <style>
+        /* ===== SPLASH SCREEN ===== */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary-color), var(--dark-color));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        
+        .splash-icon {
+            font-size: 6rem;
+            margin-bottom: 1rem;
+            animation: pulse 2s infinite;
+        }
+        
+        .splash-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: 2px;
+        }
+        
+        .splash-subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+        }
+        
+        .splash-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* ===== LOGIN SECTION ===== */
         .login-section {
             max-width: 450px;
             margin: 30px auto;
             padding: 0 15px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
         }
+        
+        .login-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
         .login-card {
             background: white;
             border-radius: var(--border-radius);
             padding: 2rem;
             box-shadow: var(--box-shadow);
         }
+        
         .login-header {
             text-align: center;
             margin-bottom: 2rem;
         }
+        
         .login-header .logo-icon {
             font-size: 3rem;
             color: var(--secondary-color);
         }
+        
         .login-header h1 {
             color: var(--primary-color);
             font-size: 1.5rem;
             margin-top: 0.5rem;
         }
+        
         .test-credentials {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
@@ -45,38 +128,29 @@
             font-size: 0.85rem;
             color: #666;
         }
+        
         .hidden {
             display: none !important;
         }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--secondary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
         
-        /* ===== ESTADO DEL SERVIDOR - CORREGIDO ===== */
+        /* ===== ESTADO DEL SERVIDOR ===== */
         .connection-status {
             position: fixed;
-            top: 70px;  /* Bajado para que no se superponga con el header */
+            top: 70px;
             right: 15px;
             padding: 0.5rem 1rem;
             border-radius: var(--border-radius);
             font-size: 0.8rem;
             font-weight: 600;
-            z-index: 150;  /* Menor que el header */
+            z-index: 150;
             box-shadow: var(--box-shadow);
         }
+        
         .connection-status.online {
             background: var(--accent-color);
             color: white;
         }
+        
         .connection-status.offline {
             background: var(--danger-color);
             color: white;
@@ -85,16 +159,20 @@
         .page-section {
             display: none;
         }
+        
         .page-section.active {
             display: block;
         }
+        
         .avatar {
             cursor: pointer;
             transition: transform 0.2s;
         }
+        
         .avatar:hover {
             transform: scale(1.1);
         }
+        
         .logout-btn {
             background: var(--danger-color);
             color: white;
@@ -107,9 +185,11 @@
             margin-left: 0.8rem;
             transition: var(--transition);
         }
+        
         .logout-btn:hover {
             background: #c0392b;
         }
+        
         .floating-badge {
             background-color: var(--danger-color);
             color: white;
@@ -123,43 +203,28 @@
             font-weight: bold;
             margin-left: 0.2rem;
         }
-        .sale-item {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #eee;
-            font-size: 0.85rem;
-        }
-        .remove-item-btn {
-            background: none;
-            border: none;
-            color: var(--danger-color);
-            font-size: 1.1rem;
-            cursor: pointer;
-            padding: 0.2rem 0.5rem;
-        }
-        .remove-item-btn:hover {
-            color: #c0392b;
-        }
+        
         .user-info {
             display: flex;
             align-items: center;
         }
-        
-        /* Eliminar cualquier duplicado de información de vendedora */
-        .vendedora-info-card {
-            display: none !important;
-        }
     </style>
 </head>
 <body>
-    <!-- Estado del servidor - AHORA MÁS ABAJO -->
-    <div id="serverStatus" class="connection-status online">
+    <!-- ===== SPLASH SCREEN ===== -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-icon">👗</div>
+        <div class="splash-title">Facturación</div>
+        <div class="splash-subtitle">Sistema para Vendedoras</div>
+        <div class="splash-spinner"></div>
+    </div>
+
+    <!-- ===== ESTADO DEL SERVIDOR (oculto hasta después del splash) ===== -->
+    <div id="serverStatus" class="connection-status online" style="display: none;">
         🔍 Verificando conexión...
     </div>
 
-    <!-- ========== PANEL DE LOGIN ========== -->
+    <!-- ===== PANEL DE LOGIN ===== -->
     <div id="loginPanel" class="login-section">
         <div class="login-header">
             <div class="logo-icon">👗</div>
@@ -193,7 +258,7 @@
         </div>
     </div>
 
-    <!-- ========== PANEL DE VENTA ========== -->
+    <!-- ===== PANEL DE VENTA (oculto hasta login) ===== -->
     <div id="ventaPanel" style="display: none;">
         <header>
             <div class="header-container">
@@ -300,9 +365,6 @@
                         <div class="card-value" id="carritoCount">0</div>
                     </div>
                 </div>
-
-                <!-- ===== ELIMINADA LA TARJETA DE INFORMACIÓN DE VENDEDORA ===== -->
-                <!-- Ya no se muestra aquí, solo en el header -->
 
                 <!-- Productos disponibles -->
                 <h2 class="section-title">
@@ -499,685 +561,22 @@
     <!-- Notificación -->
     <div id="notification" class="notification" style="display: none;"></div>
 
+    <!-- Service Worker Registration -->
     <script>
-        // ===========================================
-        // APP VENDEDORA - LOGIN REAL CON EL SERVIDOR
-        // ===========================================
-        
-        const API_URL = 'https://sistema-test-api.onrender.com';
-        
-        const App = {
-            usuario: null,
-            currentPage: 'dashboard',
-            productos: [],
-            carrito: [],
-            ventas: [],
-            categoriaActiva: 'todos',
-            
-            init() {
-                this.checkLogin();
-                this.setupEventListeners();
-                this.testServerConnection();
-                this.setupNavigation();
-                this.setupFloatingButton();
-                this.setupSearchAndFilters();
-                this.setupReportes();
-            },
-            
-            async testServerConnection() {
-                const statusDiv = document.getElementById('serverStatus');
-                try {
-                    const response = await fetch(API_URL);
-                    if (response.ok) {
-                        const data = await response.json();
-                        statusDiv.className = 'connection-status online';
-                        statusDiv.innerHTML = `✓ Conectado - ${data.productos} productos, ${data.vendedoras} vendedoras`;
-                    } else {
-                        throw new Error('Error en respuesta');
-                    }
-                } catch (error) {
-                    statusDiv.className = 'connection-status offline';
-                    statusDiv.innerHTML = '✗ Sin conexión';
-                }
-            },
-            
-            checkLogin() {
-                const savedUser = localStorage.getItem('vendedora_activa');
-                if (savedUser) {
-                    try {
-                        this.usuario = JSON.parse(savedUser);
-                        this.showVentaPanel();
-                        this.cargarProductos();
-                        this.actualizarInfoUsuario();
-                        this.cargarVentas();
-                    } catch (e) {
-                        this.showLoginPanel();
-                    }
-                } else {
-                    this.showLoginPanel();
-                }
-            },
-            
-            async login() {
-                const usuario = document.getElementById('usuario').value.trim();
-                const password = document.getElementById('password').value;
-                
-                if (!usuario || !password) {
-                    this.showError('Usuario y contraseña son obligatorios');
-                    return;
-                }
-                
-                const btn = document.getElementById('btnLogin');
-                btn.disabled = true;
-                btn.textContent = '🔐 Verificando...';
-                
-                try {
-                    const response = await fetch(`${API_URL}/api/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ usuario, password })
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('✅ ServiceWorker registrado');
+                    })
+                    .catch(error => {
+                        console.log('❌ Error al registrar ServiceWorker:', error);
                     });
-                    
-                    const data = await response.json();
-                    
-                    if (response.ok && data.success) {
-                        this.usuario = data.usuario;
-                        localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
-                        
-                        this.actualizarInfoUsuario();
-                        this.showVentaPanel();
-                        this.cargarProductos();
-                        this.cargarVentas();
-                        this.showError('', 'clear');
-                        
-                        this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
-                    } else {
-                        this.showError(data.error || 'Credenciales incorrectas');
-                    }
-                    
-                } catch (error) {
-                    console.error('Error en login:', error);
-                    this.showError('Error de conexión con el servidor');
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = '🔑 Iniciar Sesión';
-                }
-            },
-            
-            logout() {
-                if (confirm('¿Cerrar sesión?')) {
-                    localStorage.removeItem('vendedora_activa');
-                    this.usuario = null;
-                    this.carrito = [];
-                    this.ventas = [];
-                    this.showLoginPanel();
-                    this.mostrarNotificacion('👋 Sesión cerrada');
-                }
-            },
-            
-            setupNavigation() {
-                document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const page = item.dataset.page;
-                        this.switchPage(page);
-                    });
-                });
-                
-                document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
-                document.getElementById('userAvatar').addEventListener('click', () => this.logout());
-            },
-            
-            switchPage(page) {
-                document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
-                    item.classList.remove('active');
-                    if (item.dataset.page === page) {
-                        item.classList.add('active');
-                    }
-                });
-                
-                document.querySelectorAll('#ventaPanel .page-section').forEach(section => {
-                    section.classList.remove('active');
-                });
-                
-                document.getElementById(`${page}Section`).classList.add('active');
-                this.currentPage = page;
-                
-                if (page === 'products') {
-                    this.cargarInventario();
-                } else if (page === 'sales') {
-                    this.cargarTodasLasVentas();
-                }
-            },
-            
-            setupSearchAndFilters() {
-                const searchInput = document.getElementById('searchInput');
-                const searchBtn = document.getElementById('searchBtn');
-                
-                const performSearch = () => {
-                    const term = searchInput.value.toLowerCase();
-                    this.filtrarProductos(term, this.categoriaActiva);
-                };
-                
-                searchInput.addEventListener('input', performSearch);
-                searchBtn.addEventListener('click', performSearch);
-                
-                document.querySelectorAll('.category-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                        this.categoriaActiva = btn.dataset.category;
-                        this.filtrarProductos(document.getElementById('searchInput').value.toLowerCase(), this.categoriaActiva);
-                    });
-                });
-            },
-            
-            filtrarProductos(termino, categoria = 'todos') {
-                const cards = document.querySelectorAll('#productoContainer .product-card');
-                cards.forEach(card => {
-                    const nombre = card.querySelector('.product-name')?.textContent.toLowerCase() || '';
-                    const categoriaProducto = card.dataset.categoria || 'general';
-                    
-                    let mostrar = true;
-                    
-                    if (termino && !nombre.includes(termino)) {
-                        mostrar = false;
-                    }
-                    
-                    if (categoria !== 'todos' && categoriaProducto !== categoria) {
-                        mostrar = false;
-                    }
-                    
-                    card.style.display = mostrar ? 'block' : 'none';
-                });
-            },
-            
-            setupFloatingButton() {
-                const floatingBtn = document.getElementById('floatingSaleBtn');
-                const closeBtn = document.getElementById('closeSaleBtn');
-                const panel = document.getElementById('currentSalePanel');
-                const ventaActualCard = document.getElementById('ventaActualCard');
-                
-                floatingBtn.addEventListener('click', () => {
-                    panel.classList.toggle('active');
-                });
-                
-                closeBtn.addEventListener('click', () => {
-                    panel.classList.remove('active');
-                });
-                
-                ventaActualCard.addEventListener('click', () => {
-                    panel.classList.toggle('active');
-                });
-                
-                document.getElementById('clearSaleBtn').addEventListener('click', () => {
-                    this.limpiarCarrito();
-                });
-                
-                document.getElementById('completeSaleBtn').addEventListener('click', () => {
-                    this.completarVenta();
-                });
-            },
-            
-            async cargarProductos() {
-                const container = document.getElementById('productoContainer');
-                const countSpan = document.getElementById('productCount');
-                const totalProductosSpan = document.getElementById('totalProductosCount');
-                const inventoryTotalSpan = document.getElementById('inventoryTotalProducts');
-                
-                try {
-                    const response = await fetch(`${API_URL}/api/dueno/productos`);
-                    this.productos = await response.json();
-                    
-                    if (countSpan) countSpan.textContent = `(${this.productos.length} productos)`;
-                    if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
-                    if (inventoryTotalSpan) inventoryTotalSpan.textContent = this.productos.length;
-                    
-                    if (this.productos.length === 0) {
-                        container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px;">No hay productos disponibles</div>';
-                        return;
-                    }
-                    
-                    let html = '';
-                    this.productos.forEach(p => {
-                        const stockClass = p.stock < 5 ? 'low-stock' : '';
-                        const stockText = p.stock === 0 ? 'out-of-stock' : '';
-                        
-                        html += `
-                            <div class="product-card ${stockClass} ${stockText}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
-                                <div class="product-icon">📦</div>
-                                <div class="product-name">${p.nombre}</div>
-                                <div class="product-price">$${p.precio.toFixed(2)}</div>
-                                <div class="product-stock">Stock: ${p.stock} uds</div>
-                                <div class="product-actions">
-                                    <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${p.stock}">
-                                    <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')">
-                                        🛒 Agregar
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    
-                    container.innerHTML = html;
-                    this.cargarInventario();
-                    
-                } catch (error) {
-                    console.error('Error cargando productos:', error);
-                    container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px; color: #e74c3c;">❌ Error cargando productos</div>';
-                }
-            },
-            
-            agregarAlCarrito(productoId) {
-                const producto = this.productos.find(p => p.id === productoId);
-                const cantidadInput = document.getElementById(`cantidad-${productoId}`);
-                const cantidad = parseInt(cantidadInput?.value || '1');
-                
-                if (!producto) return;
-                
-                if (cantidad > producto.stock) {
-                    this.mostrarNotificacion('❌ Stock insuficiente');
-                    return;
-                }
-                
-                const itemExistente = this.carrito.find(item => item.id === productoId);
-                
-                if (itemExistente) {
-                    if (itemExistente.cantidad + cantidad > producto.stock) {
-                        this.mostrarNotificacion('❌ Stock insuficiente');
-                        return;
-                    }
-                    itemExistente.cantidad += cantidad;
-                } else {
-                    this.carrito.push({
-                        id: producto.id,
-                        nombre: producto.nombre,
-                        precio: producto.precio,
-                        cantidad: cantidad,
-                        stock: producto.stock
-                    });
-                }
-                
-                this.actualizarCarrito();
-                this.mostrarNotificacion(`✅ ${producto.nombre} x${cantidad} agregado`);
-            },
-            
-            quitarDelCarrito(productoId) {
-                this.carrito = this.carrito.filter(item => item.id !== productoId);
-                this.actualizarCarrito();
-                this.mostrarNotificacion('🗑️ Producto eliminado');
-            },
-            
-            limpiarCarrito() {
-                if (this.carrito.length === 0) return;
-                
-                if (confirm('¿Cancelar la venta actual?')) {
-                    this.carrito = [];
-                    this.actualizarCarrito();
-                    document.getElementById('currentSalePanel').classList.remove('active');
-                    this.mostrarNotificacion('🔄 Venta cancelada');
-                }
-            },
-            
-            actualizarCarrito() {
-                const container = document.getElementById('saleItemsContainer');
-                const itemsCount = document.getElementById('saleItemsCount');
-                const cartBadge = document.getElementById('cartBadge');
-                const carritoCount = document.getElementById('carritoCount');
-                const subtotalSpan = document.getElementById('subtotal');
-                const totalSpan = document.getElementById('total');
-                
-                let subtotal = 0;
-                
-                if (this.carrito.length === 0) {
-                    container.innerHTML = '<div class="empty-message">No hay productos en la venta actual</div>';
-                    itemsCount.textContent = '(0 productos)';
-                    cartBadge.textContent = '0';
-                    cartBadge.style.display = 'none';
-                    carritoCount.textContent = '0';
-                    subtotalSpan.textContent = '$0.00';
-                    totalSpan.textContent = '$0.00';
-                    return;
-                }
-                
-                let html = '';
-                this.carrito.forEach(item => {
-                    const itemSubtotal = item.precio * item.cantidad;
-                    subtotal += itemSubtotal;
-                    
-                    html += `
-                        <div class="sale-item">
-                            <div>${item.nombre}</div>
-                            <div>$${item.precio.toFixed(2)}</div>
-                            <div>${item.cantidad}</div>
-                            <div>$${itemSubtotal.toFixed(2)}</div>
-                            <div>
-                                <button class="remove-item-btn" onclick="App.quitarDelCarrito('${item.id}')">✖</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-                itemsCount.textContent = `(${this.carrito.reduce((sum, i) => sum + i.cantidad, 0)} productos)`;
-                cartBadge.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
-                cartBadge.style.display = 'flex';
-                carritoCount.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
-                subtotalSpan.textContent = `$${subtotal.toFixed(2)}`;
-                totalSpan.textContent = `$${subtotal.toFixed(2)}`;
-            },
-            
-            async completarVenta() {
-                if (this.carrito.length === 0) {
-                    this.mostrarNotificacion('❌ No hay productos en la venta');
-                    return;
-                }
-                
-                const cliente = document.getElementById('clientName').value.trim() || 'Cliente General';
-                const total = this.carrito.reduce((sum, i) => sum + (i.precio * i.cantidad), 0);
-                const fecha = new Date();
-                
-                const venta = {
-                    id: Date.now().toString(),
-                    cliente: cliente,
-                    productos: [...this.carrito],
-                    total: total,
-                    fecha: fecha.toISOString(),
-                    vendedora: this.usuario.nombre,
-                    vendedoraId: this.usuario.id,
-                    estado: 'completada'
-                };
-                
-                this.ventas.push(venta);
-                localStorage.setItem('ventas_vendedora', JSON.stringify(this.ventas));
-                
-                const ventasHoy = document.getElementById('ventasHoyCount');
-                ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
-                
-                this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
-                
-                this.carrito = [];
-                this.actualizarCarrito();
-                document.getElementById('currentSalePanel').classList.remove('active');
-                document.getElementById('clientName').value = '';
-                
-                this.cargarVentasRecientes();
-                this.cargarTodasLasVentas();
-                this.actualizarDashboard();
-            },
-            
-            cargarVentas() {
-                const ventasGuardadas = localStorage.getItem('ventas_vendedora');
-                if (ventasGuardadas) {
-                    try {
-                        this.ventas = JSON.parse(ventasGuardadas);
-                    } catch (e) {
-                        this.ventas = [];
-                    }
-                }
-                this.cargarVentasRecientes();
-                this.actualizarDashboard();
-            },
-            
-            cargarVentasRecientes() {
-                const container = document.getElementById('ventasRecientesContainer');
-                
-                if (this.ventas.length === 0) {
-                    container.innerHTML = '<div class="empty-message" style="padding: 1.5rem;">No hay ventas registradas aún</div>';
-                    return;
-                }
-                
-                const recientes = [...this.ventas].reverse().slice(0, 5);
-                
-                let html = '';
-                recientes.forEach(v => {
-                    const fecha = new Date(v.fecha);
-                    const fechaStr = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
-                    
-                    html += `
-                        <div class="history-item">
-                            <div>
-                                <div style="font-weight: 600;">${v.cliente}</div>
-                                <div style="font-size: 0.75rem; color: #666;">${fechaStr}</div>
-                            </div>
-                            <div>${v.productos.reduce((sum, i) => sum + i.cantidad, 0)} productos</div>
-                            <div style="font-weight: bold; color: var(--accent-color);">$${v.total.toFixed(2)}</div>
-                            <div><span class="status status-completed">Completada</span></div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            },
-            
-            cargarTodasLasVentas() {
-                const container = document.getElementById('allSalesContainer');
-                const totalSalesAmount = document.getElementById('totalSalesAmount');
-                const avgSaleAmount = document.getElementById('avgSaleAmount');
-                const totalSalesCount = document.getElementById('totalSalesCount');
-                
-                if (this.ventas.length === 0) {
-                    container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
-                    totalSalesAmount.textContent = '$0.00';
-                    avgSaleAmount.textContent = '$0.00';
-                    totalSalesCount.textContent = '0';
-                    return;
-                }
-                
-                const total = this.ventas.reduce((sum, v) => sum + v.total, 0);
-                const promedio = total / this.ventas.length;
-                
-                totalSalesAmount.textContent = `$${total.toFixed(2)}`;
-                avgSaleAmount.textContent = `$${promedio.toFixed(2)}`;
-                totalSalesCount.textContent = this.ventas.length;
-                
-                let html = '';
-                [...this.ventas].reverse().forEach(v => {
-                    const fecha = new Date(v.fecha);
-                    const fechaStr = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
-                    
-                    html += `
-                        <div class="history-item">
-                            <div>
-                                <div style="font-weight: 600;">${v.cliente}</div>
-                                <div style="font-size: 0.75rem; color: #666;">${fechaStr}</div>
-                            </div>
-                            <div>${v.productos.reduce((sum, i) => sum + i.cantidad, 0)} productos</div>
-                            <div style="font-weight: bold; color: var(--accent-color);">$${v.total.toFixed(2)}</div>
-                            <div><span class="status status-completed">Completada</span></div>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            },
-            
-            cargarInventario() {
-                const tableBody = document.getElementById('inventoryTableBody');
-                const lowStockSpan = document.getElementById('lowStockCount');
-                const outOfStockSpan = document.getElementById('outOfStockCount');
-                
-                if (this.productos.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #7f8c8d;">No hay productos en el inventario</td></tr>';
-                    return;
-                }
-                
-                const lowStock = this.productos.filter(p => p.stock > 0 && p.stock < 5).length;
-                const outOfStock = this.productos.filter(p => p.stock === 0).length;
-                
-                lowStockSpan.textContent = lowStock;
-                outOfStockSpan.textContent = outOfStock;
-                
-                let html = '';
-                this.productos.forEach(p => {
-                    let estado = 'Disponible';
-                    let estadoClass = '';
-                    
-                    if (p.stock === 0) {
-                        estado = 'Agotado';
-                        estadoClass = 'status-danger';
-                    } else if (p.stock < 5) {
-                        estado = 'Stock Bajo';
-                        estadoClass = 'status-warning';
-                    }
-                    
-                    html += `
-                        <tr>
-                            <td>${p.nombre}</td>
-                            <td>${p.categoria || 'General'}</td>
-                            <td>$${p.precio.toFixed(2)}</td>
-                            <td>${p.stock}</td>
-                            <td><span class="${estadoClass}">${estado}</span></td>
-                        </tr>
-                    `;
-                });
-                
-                tableBody.innerHTML = html;
-            },
-            
-            setupReportes() {
-                const reportDate = document.getElementById('reportDate');
-                const generateBtn = document.getElementById('generateReportBtn');
-                const exportPDFBtn = document.getElementById('exportPDFBtn');
-                const exportExcelBtn = document.getElementById('exportExcelBtn');
-                
-                const hoy = new Date().toISOString().split('T')[0];
-                reportDate.value = hoy;
-                
-                generateBtn.addEventListener('click', () => {
-                    this.generarReporte(reportDate.value);
-                });
-                
-                exportPDFBtn.addEventListener('click', () => {
-                    this.mostrarNotificacion('📄 Exportando a PDF... (simulado)');
-                    setTimeout(() => this.mostrarNotificacion('✅ PDF exportado'), 1500);
-                });
-                
-                exportExcelBtn.addEventListener('click', () => {
-                    this.mostrarNotificacion('📊 Exportando a Excel... (simulado)');
-                    setTimeout(() => this.mostrarNotificacion('✅ Excel exportado'), 1500);
-                });
-                
-                document.getElementById('exportInventoryBtn').addEventListener('click', () => {
-                    this.mostrarNotificacion('📤 Exportando inventario... (simulado)');
-                    setTimeout(() => this.mostrarNotificacion('✅ Inventario exportado'), 1500);
-                });
-                
-                document.getElementById('refreshInventoryBtn').addEventListener('click', () => {
-                    this.cargarProductos();
-                    this.mostrarNotificacion('🔄 Inventario actualizado');
-                });
-            },
-            
-            generarReporte(fecha) {
-                const dailyTotal = document.getElementById('dailyTotal');
-                const dailySalesCount = document.getElementById('dailySalesCount');
-                const dailyAvg = document.getElementById('dailyAvg');
-                const categorySales = document.getElementById('categorySales');
-                const bestProduct = document.getElementById('bestProduct');
-                const bestHour = document.getElementById('bestHour');
-                const topCategory = document.getElementById('topCategory');
-                
-                const ventasDelDia = this.ventas.filter(v => {
-                    return v.fecha.split('T')[0] === fecha;
-                });
-                
-                if (ventasDelDia.length === 0) {
-                    dailyTotal.textContent = '$0.00';
-                    dailySalesCount.textContent = '0';
-                    dailyAvg.textContent = '$0.00';
-                    categorySales.innerHTML = '<div class="empty-message">No hay ventas en esta fecha</div>';
-                    bestProduct.textContent = '-';
-                    bestHour.textContent = '-';
-                    topCategory.textContent = '-';
-                    return;
-                }
-                
-                const total = ventasDelDia.reduce((sum, v) => sum + v.total, 0);
-                const promedio = total / ventasDelDia.length;
-                
-                dailyTotal.textContent = `$${total.toFixed(2)}`;
-                dailySalesCount.textContent = ventasDelDia.length;
-                dailyAvg.textContent = `$${promedio.toFixed(2)}`;
-                
-                categorySales.innerHTML = `
-                    <div class="category-sale-item">
-                        <span>Ropa</span>
-                        <span style="font-weight: bold;">$0.00</span>
-                    </div>
-                    <div class="category-sale-item">
-                        <span>Electrónica</span>
-                        <span style="font-weight: bold;">$0.00</span>
-                    </div>
-                `;
-                
-                bestProduct.textContent = this.productos[0]?.nombre || '-';
-                bestHour.textContent = '15:00 - 17:00';
-                topCategory.textContent = 'Ropa';
-                
-                this.mostrarNotificacion(`📊 Reporte generado para ${fecha}`);
-            },
-            
-            actualizarDashboard() {
-                const pendienteCount = document.getElementById('pendienteCount');
-                pendienteCount.textContent = this.ventas.length;
-                
-                const totalProductosSpan = document.getElementById('totalProductosCount');
-                if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
-            },
-            
-            actualizarInfoUsuario() {
-                if (!this.usuario) return;
-                
-                document.getElementById('userName').textContent = this.usuario.nombre || 'Vendedora';
-                document.getElementById('userAvatar').textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
-                // Ya no actualizamos la tarjeta eliminada
-            },
-            
-            setupEventListeners() {
-                document.getElementById('btnLogin')?.addEventListener('click', () => this.login());
-                
-                document.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && document.getElementById('loginPanel').style.display !== 'none') {
-                        this.login();
-                    }
-                });
-            },
-            
-            mostrarNotificacion(mensaje) {
-                const notif = document.getElementById('notification');
-                notif.style.display = 'block';
-                notif.textContent = mensaje;
-                setTimeout(() => {
-                    notif.style.display = 'none';
-                }, 3000);
-            },
-            
-            showLoginPanel() {
-                document.getElementById('loginPanel').style.display = 'block';
-                document.getElementById('ventaPanel').style.display = 'none';
-            },
-            
-            showVentaPanel() {
-                document.getElementById('loginPanel').style.display = 'none';
-                document.getElementById('ventaPanel').style.display = 'block';
-            },
-            
-            showError(message, type = 'error') {
-                const errorDiv = document.getElementById('loginError');
-                if (type === 'clear') {
-                    errorDiv.style.display = 'none';
-                    errorDiv.textContent = '';
-                } else {
-                    errorDiv.style.display = 'block';
-                    errorDiv.textContent = message;
-                }
-            }
-        };
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            App.init();
-        });
+            });
+        }
     </script>
+
+    <!-- App JS -->
+    <script src="app_vendedora.js"></script>
 </body>
 </html>
