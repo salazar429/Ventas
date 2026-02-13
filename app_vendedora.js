@@ -1,5 +1,6 @@
 // ===========================================
 // APP VENDEDORA - OFFLINE FIRST CON SINCRONIZACIÓN
+// STOCK ACTUALIZADO CORRECTAMENTE EN VENTAS
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
@@ -43,10 +44,7 @@ class OfflineDB {
             const tx = db.transaction('productos', 'readwrite');
             const store = tx.objectStore('productos');
             
-            // Limpiar productos anteriores
             store.clear();
-            
-            // Guardar nuevos productos
             productos.forEach(p => store.put(p));
             
             tx.oncomplete = () => {
@@ -208,10 +206,7 @@ const App = {
                 const data = await response.json();
                 console.log(`✅ Servidor OK - ${data.productos} productos, ${data.vendedoras} vendedoras`);
                 
-                // Cargar productos del servidor y guardarlos offline
                 await this.cargarProductosDelServidor();
-                
-                // Sincronizar ventas pendientes
                 await this.sincronizarVentasPendientes();
             }
         } catch (error) {
@@ -224,47 +219,43 @@ const App = {
     
     // ===== PRODUCTOS OFFLINE =====
     async cargarProductosDelServidor() {
-    try {
-        const response = await fetch(`${API_URL}/api/dueno/productos`);
-        const productos = await response.json();
-        
-        // ⚠️ IMPORTANTE: No sobrescribir stock local si tenemos ventas offline pendientes
-        const pendientes = await OfflineDB.obtenerVentasPendientes();
-        
-        if (pendientes.length > 0) {
-            // Calcular stock real: stock servidor - ventas pendientes
-            const productosActualizados = productos.map(p => {
-                const ventasPendientes = pendientes.filter(v => 
-                    v.productos.some(item => item.id === p.id)
-                );
-                
-                let stockRestado = 0;
-                ventasPendientes.forEach(v => {
-                    const item = v.productos.find(i => i.id === p.id);
-                    if (item) stockRestado += item.cantidad;
+        try {
+            const response = await fetch(`${API_URL}/api/dueno/productos`);
+            const productos = await response.json();
+            
+            // Obtener ventas pendientes para calcular stock real
+            const pendientes = await OfflineDB.obtenerVentasPendientes();
+            
+            if (pendientes.length > 0) {
+                // Calcular stock real: stock servidor - ventas pendientes
+                const productosActualizados = productos.map(p => {
+                    let stockRestado = 0;
+                    pendientes.forEach(v => {
+                        const item = v.productos.find(i => i.id === p.id);
+                        if (item) stockRestado += item.cantidad;
+                    });
+                    
+                    return {
+                        ...p,
+                        stock: Math.max(0, p.stock - stockRestado)
+                    };
                 });
                 
-                return {
-                    ...p,
-                    stock: p.stock - stockRestado
-                };
-            });
+                await OfflineDB.guardarProductos(productosActualizados);
+            } else {
+                await OfflineDB.guardarProductos(productos);
+            }
             
-            await OfflineDB.guardarProductos(productosActualizados);
-        } else {
-            await OfflineDB.guardarProductos(productos);
+            if (this.usuario) {
+                await this.cargarProductosOffline();
+            }
+            
+            return productos;
+        } catch (error) {
+            console.error('Error cargando productos del servidor:', error);
+            return [];
         }
-        
-        if (this.usuario) {
-            await this.cargarProductosOffline();
-        }
-        
-        return productos;
-    } catch (error) {
-        console.error('Error cargando productos del servidor:', error);
-        return [];
-    }
-}
+    },
     
     async cargarProductosOffline() {
         try {
@@ -293,7 +284,6 @@ const App = {
                 }, 500);
             }
             
-            // Mostrar login con animación
             const loginPanel = document.getElementById('loginPanel');
             if (loginPanel) loginPanel.classList.add('visible');
             
@@ -609,6 +599,8 @@ const App = {
         this.productos.forEach(p => {
             const stockClass = p.stock < 5 ? 'low-stock' : '';
             const stockText = p.stock === 0 ? 'out-of-stock' : '';
+            const disabled = p.stock === 0 ? 'disabled' : '';
+            const maxStock = p.stock;
             
             html += `
                 <div class="product-card ${stockClass} ${stockText}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
@@ -617,8 +609,8 @@ const App = {
                     <div class="product-price">$${p.precio.toFixed(2)}</div>
                     <div class="product-stock">Stock: ${p.stock} uds</div>
                     <div class="product-actions">
-                        <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${p.stock}">
-                        <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')">
+                        <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${maxStock}" ${disabled}>
+                        <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')" ${disabled}>
                             🛒 Agregar
                         </button>
                     </div>
@@ -630,172 +622,48 @@ const App = {
         this.cargarInventario();
     },
     
-    // ===== VENTAS OFFLINE =====
-    async cargarVentasLocales() {
-        try {
-            this.ventas = await OfflineDB.cargarVentasCompletadas();
-            this.cargarVentasRecientes();
-            this.cargarTodasLasVentas();
-            this.actualizarDashboard();
-        } catch (error) {
-            console.error('Error cargando ventas:', error);
-            this.ventas = [];
-        }
-    },
-    
-     completarVenta() {
-     // ========== COMPLETAR VENTA - CON ACTUALIZACIÓN DE STOCK ==========
-async completarVenta() {
-    if (this.carrito.length === 0) {
-        this.mostrarNotificacion('❌ No hay productos en la venta');
-        return;
-    }
-    
-    const cliente = document.getElementById('clientName')?.value.trim() || 'Cliente General';
-    const total = this.carrito.reduce((sum, i) => sum + (i.precio * i.cantidad), 0);
-    
-    // Verificar stock suficiente ANTES de procesar
-    for (const item of this.carrito) {
-        const producto = this.productos.find(p => p.id === item.id);
-        if (!producto || item.cantidad > producto.stock) {
-            this.mostrarNotificacion(`❌ Stock insuficiente para ${item.nombre}`);
+    // ===== VENTAS CON ACTUALIZACIÓN DE STOCK =====
+    async completarVenta() {
+        if (this.carrito.length === 0) {
+            this.mostrarNotificacion('❌ No hay productos en la venta');
             return;
         }
-    }
-    
-    const venta = {
-        id: `venta_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-        cliente: cliente,
-        productos: [...this.carrito],
-        total: total,
-        fecha: new Date().toISOString(),
-        vendedora: this.usuario?.nombre || 'Vendedora',
-        vendedoraId: this.usuario?.id || '',
-        estado: this.online ? 'completada' : 'pendiente'
-    };
-    
-    if (this.online) {
-        // ===== MODO ONLINE - ACTUALIZAR STOCK EN SERVIDOR =====
-        let exito = true;
         
-        // 1. Actualizar stock de cada producto en el servidor
+        const cliente = document.getElementById('clientName')?.value.trim() || 'Cliente General';
+        const total = this.carrito.reduce((sum, i) => sum + (i.precio * i.cantidad), 0);
+        
+        // Verificar stock suficiente ANTES de procesar
         for (const item of this.carrito) {
             const producto = this.productos.find(p => p.id === item.id);
-            if (!producto) continue;
-            
-            const nuevoStock = producto.stock - item.cantidad;
-            
-            try {
-                const response = await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        nombre: producto.nombre,
-                        precio: producto.precio,
-                        stock: nuevoStock
-                    })
-                });
-                
-                if (!response.ok) {
-                    exito = false;
-                    this.mostrarNotificacion(`❌ Error actualizando stock de ${item.nombre}`);
-                    break;
-                }
-                
-                // Actualizar stock local
-                producto.stock = nuevoStock;
-                
-            } catch (error) {
-                console.error('Error actualizando stock:', error);
-                exito = false;
-                this.mostrarNotificacion('❌ Error de conexión al actualizar stock');
-                break;
+            if (!producto || item.cantidad > producto.stock) {
+                this.mostrarNotificacion(`❌ Stock insuficiente para ${item.nombre}`);
+                return;
             }
         }
         
-        if (exito) {
-            // 2. Guardar venta como completada
-            await OfflineDB.guardarVentaCompletada(venta);
-            this.ventas.push(venta);
+        const venta = {
+            id: `venta_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            cliente: cliente,
+            productos: [...this.carrito],
+            total: total,
+            fecha: new Date().toISOString(),
+            vendedora: this.usuario?.nombre || 'Vendedora',
+            vendedoraId: this.usuario?.id || '',
+            estado: this.online ? 'completada' : 'pendiente'
+        };
+        
+        if (this.online) {
+            // ===== MODO ONLINE - ACTUALIZAR STOCK EN SERVIDOR =====
+            let exito = true;
             
-            // 3. Actualizar productos en IndexedDB
-            await OfflineDB.guardarProductos(this.productos);
-            
-            // 4. Actualizar contador
-            const ventasHoy = document.getElementById('ventasHoyCount');
-            if (ventasHoy) ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
-            
-            this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
-            
-            // 5. Recargar productos para mostrar stock actualizado
-            this.renderizarProductos();
-            this.cargarInventario();
-        }
-        
-    } else {
-        // ===== MODO OFFLINE - GUARDAR VENTA PENDIENTE =====
-        await OfflineDB.guardarVentaPendiente(venta);
-        this.mostrarNotificacion(`⏳ Venta guardada offline - Se sincronizará automáticamente`);
-        
-        // OFFLINE: Restar stock localmente aunque no haya conexión
-        for (const item of this.carrito) {
-            const producto = this.productos.find(p => p.id === item.id);
-            if (producto) {
-                producto.stock -= item.cantidad;
-            }
-        }
-        
-        // Guardar productos actualizados localmente
-        await OfflineDB.guardarProductos(this.productos);
-        
-        // Actualizar vista
-        this.renderizarProductos();
-        this.cargarInventario();
-        
-        // Actualizar contador local
-        const ventasHoy = document.getElementById('ventasHoyCount');
-        if (ventasHoy) ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
-    }
-    
-    // ===== LIMPIEZA FINAL =====
-    this.carrito = [];
-    this.actualizarCarrito();
-    document.getElementById('currentSalePanel')?.classList.remove('active');
-    if (document.getElementById('clientName')) document.getElementById('clientName').value = '';
-    
-    // Actualizar todas las vistas
-    await this.cargarVentasLocales();
-    this.actualizarDashboard();
-},
-
-// ========== SINCRONIZAR VENTAS PENDIENTES (ACTUALIZADO) ==========
-async sincronizarVentasPendientes() {
-    if (!this.online || this.sincronizando) return;
-    
-    const pendientes = await OfflineDB.obtenerVentasPendientes();
-    if (pendientes.length === 0) return;
-    
-    this.sincronizando = true;
-    this.actualizarEstadoConexion();
-    
-    console.log(`🔄 Sincronizando ${pendientes.length} ventas pendientes...`);
-    this.mostrarNotificacion(`🔄 Sincronizando ${pendientes.length} ventas...`);
-    
-    let sincronizadas = 0;
-    
-    for (const venta of pendientes) {
-        try {
-            // 1. Actualizar stock de cada producto en el servidor
-            for (const item of venta.productos) {
-                // Obtener producto actual del servidor
-                const prodResponse = await fetch(`${API_URL}/api/dueno/productos`);
-                const productos = await prodResponse.json();
-                const producto = productos.find(p => p.id === item.id);
+            for (const item of this.carrito) {
+                const producto = this.productos.find(p => p.id === item.id);
+                if (!producto) continue;
                 
-                if (producto) {
-                    const nuevoStock = producto.stock - item.cantidad;
-                    
-                    await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
+                const nuevoStock = producto.stock - item.cantidad;
+                
+                try {
+                    const response = await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -804,40 +672,71 @@ async sincronizarVentasPendientes() {
                             stock: nuevoStock
                         })
                     });
+                    
+                    if (!response.ok) {
+                        exito = false;
+                        this.mostrarNotificacion(`❌ Error actualizando stock de ${item.nombre}`);
+                        break;
+                    }
+                    
+                    producto.stock = nuevoStock;
+                    
+                } catch (error) {
+                    console.error('Error actualizando stock:', error);
+                    exito = false;
+                    this.mostrarNotificacion('❌ Error de conexión al actualizar stock');
+                    break;
                 }
             }
             
-            // 2. Marcar venta como completada
-            venta.estado = 'completada';
-            await OfflineDB.guardarVentaCompletada(venta);
-            await OfflineDB.eliminarVentaPendiente(venta.id);
-            this.ventas.push(venta);
-            sincronizadas++;
+            if (exito) {
+                await OfflineDB.guardarVentaCompletada(venta);
+                this.ventas.push(venta);
+                await OfflineDB.guardarProductos(this.productos);
+                
+                const ventasHoy = document.getElementById('ventasHoyCount');
+                if (ventasHoy) ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
+                
+                this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
+                this.renderizarProductos();
+                this.cargarInventario();
+            }
             
-        } catch (error) {
-            console.error('Error sincronizando venta:', venta.id, error);
+        } else {
+            // ===== MODO OFFLINE - GUARDAR VENTA PENDIENTE =====
+            await OfflineDB.guardarVentaPendiente(venta);
+            this.mostrarNotificacion(`⏳ Venta guardada offline - Se sincronizará automáticamente`);
+            
+            for (const item of this.carrito) {
+                const producto = this.productos.find(p => p.id === item.id);
+                if (producto) {
+                    producto.stock -= item.cantidad;
+                }
+            }
+            
+            await OfflineDB.guardarProductos(this.productos);
+            this.renderizarProductos();
+            this.cargarInventario();
+            
+            const ventasHoy = document.getElementById('ventasHoyCount');
+            if (ventasHoy) ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
         }
-    }
-    
-    // 3. Recargar productos del servidor para tener stock actualizado
-    await this.cargarProductosDelServidor();
-    
-    this.sincronizando = false;
-    this.actualizarEstadoConexion();
-    
-    if (sincronizadas > 0) {
-        this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente`);
+        
+        // ===== LIMPIEZA FINAL =====
+        this.carrito = [];
+        this.actualizarCarrito();
+        document.getElementById('currentSalePanel')?.classList.remove('active');
+        if (document.getElementById('clientName')) document.getElementById('clientName').value = '';
+        
         await this.cargarVentasLocales();
-        this.renderizarProductos();
-        this.cargarInventario();
-    }
-},
+        this.actualizarDashboard();
+    },
     
+    // ===== SINCRONIZAR VENTAS PENDIENTES =====
     async sincronizarVentasPendientes() {
         if (!this.online || this.sincronizando) return;
         
         const pendientes = await OfflineDB.obtenerVentasPendientes();
-        
         if (pendientes.length === 0) return;
         
         this.sincronizando = true;
@@ -850,17 +749,38 @@ async sincronizarVentasPendientes() {
         
         for (const venta of pendientes) {
             try {
-                // Aquí iría la llamada real al API de ventas
-                // Por ahora simulamos éxito
+                for (const item of venta.productos) {
+                    const prodResponse = await fetch(`${API_URL}/api/dueno/productos`);
+                    const productos = await prodResponse.json();
+                    const producto = productos.find(p => p.id === item.id);
+                    
+                    if (producto) {
+                        const nuevoStock = producto.stock - item.cantidad;
+                        
+                        await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                nombre: producto.nombre,
+                                precio: producto.precio,
+                                stock: nuevoStock
+                            })
+                        });
+                    }
+                }
+                
                 venta.estado = 'completada';
                 await OfflineDB.guardarVentaCompletada(venta);
                 await OfflineDB.eliminarVentaPendiente(venta.id);
                 this.ventas.push(venta);
                 sincronizadas++;
+                
             } catch (error) {
                 console.error('Error sincronizando venta:', venta.id, error);
             }
         }
+        
+        await this.cargarProductosDelServidor();
         
         this.sincronizando = false;
         this.actualizarEstadoConexion();
@@ -868,6 +788,21 @@ async sincronizarVentasPendientes() {
         if (sincronizadas > 0) {
             this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente`);
             await this.cargarVentasLocales();
+            this.renderizarProductos();
+            this.cargarInventario();
+        }
+    },
+    
+    // ===== VENTAS LOCALES =====
+    async cargarVentasLocales() {
+        try {
+            this.ventas = await OfflineDB.cargarVentasCompletadas();
+            this.cargarVentasRecientes();
+            this.cargarTodasLasVentas();
+            this.actualizarDashboard();
+        } catch (error) {
+            console.error('Error cargando ventas:', error);
+            this.ventas = [];
         }
     },
     
@@ -1167,10 +1102,10 @@ async sincronizarVentasPendientes() {
     }
 };
 
-// Hacer App accesible globalmente
+// ===== HACER APP ACCESIBLE GLOBALMENTE =====
 window.App = App;
 
-// Iniciar cuando el DOM esté listo
+// ===== INICIAR APP =====
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
 });
