@@ -261,20 +261,23 @@
     <!-- ===== PANEL DE VENTA (oculto hasta login) ===== -->
     <div id="ventaPanel" style="display: none;">
         <header>
-            <div class="header-container">
-                <div class="logo">
-                    <span>📊</span>
-                    <h1>Facturación</h1>
-                </div>
-                <div class="user-info">
-                    <span id="userName">Vendedora</span>
-                    <div class="avatar" id="userAvatar" title="Perfil">V</div>
-                    <button id="logoutBtn" class="logout-btn">
-                        🚪 Salir
-                    </button>
-                </div>
+           <div class="header-container">
+             <div class="logo">
+                <span>📊</span>
+                   <h1>Facturación</h1>
             </div>
-        </header>
+           <div class="user-info">
+             <span id="userName">Vendedora</span>
+             <div class="avatar" id="userAvatar" title="Perfil">V</div>
+             <button id="logoutBtn" class="logout-btn">
+                🚪 Salir
+             </button>
+            <!-- PUNTO DE ESTADO DE CONEXIÓN -->
+            <div id="connectionDot" class="connection-dot online" title="Conectado"></div>
+        </div>
+    </div>
+</header>
+
 
         <!-- Barra de búsqueda -->
         <div class="search-container">
