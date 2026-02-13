@@ -199,6 +199,41 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+        /* ===== ESTILOS PARA VENTAS PENDIENTES ===== */
+.status-warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.history-item[style*="border-left"] {
+    background-color: #fff3e0;
+}
+
+#pendientesBanner {
+    animation: slideDown 0.3s ease;
+    margin: 10px 15px;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mejorar la card de pendientes */
+.card[onclick] {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.card[onclick]:hover {
+    transform: scale(1.02);
+        }
     </style>
 </head>
 <body>
