@@ -1343,4 +1343,58 @@ const App = {
     },
     
     // ===== NOTIFICACIONES =====
-   
+    mostrarNotificacion(mensaje) {
+        const notif = document.getElementById('notification');
+        if (notif) {
+            notif.style.display = 'block';
+            notif.textContent = mensaje;
+            setTimeout(() => {
+                notif.style.display = 'none';
+            }, 3000);
+        }
+    },
+    
+    // ===== PANELES =====
+    showLoginPanel() {
+        const loginPanel = document.getElementById('loginPanel');
+        const ventaPanel = document.getElementById('ventaPanel');
+        
+        if (loginPanel) {
+            loginPanel.style.display = 'block';
+            setTimeout(() => loginPanel.classList.add('visible'), 50);
+        }
+        if (ventaPanel) ventaPanel.style.display = 'none';
+    },
+    
+    showVentaPanel() {
+        const loginPanel = document.getElementById('loginPanel');
+        const ventaPanel = document.getElementById('ventaPanel');
+        
+        if (loginPanel) {
+            loginPanel.style.display = 'none';
+            loginPanel.classList.remove('visible');
+        }
+        if (ventaPanel) ventaPanel.style.display = 'block';
+    },
+    
+    showError(message, type = 'error') {
+        const errorDiv = document.getElementById('loginError');
+        if (errorDiv) {
+            if (type === 'clear') {
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            } else {
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = message;
+            }
+        }
+    }
+};
+
+// ===== HACER APP ACCESIBLE GLOBALMENTE =====
+window.App = App;
+
+// ===== INICIAR APP =====
+document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+});
