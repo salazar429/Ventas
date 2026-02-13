@@ -1,13 +1,14 @@
 // ===========================================
-// APP VENDEDORA - OFFLINE FIRST CON SINCRONIZACIÓN
-// VERSIÓN FINAL - CORREGIDA: SINCRONIZACIÓN AUTOMÁTICA + BOTÓN FORZAR
+// APP VENDEDORA - VERSIÓN CORREGIDA
+// SIN BOTÓN FLOTANTE DUPLICADO
+// CON CATEGORÍAS FUNCIONALES
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
 const DB_NAME = 'FacturacionDB';
 const DB_VERSION = 2;
 
-// ========== INDEXEDDB PARA ALMACENAMIENTO OFFLINE ==========
+// ========== INDEXEDDB ==========
 class OfflineDB {
     static async abrirDB() {
         return new Promise((resolve, reject) => {
@@ -174,7 +175,6 @@ const App = {
         this.setupSearchAndFilters();
         this.setupReportes();
         this.setupPendientesClick();
-        this.agregarBotonForzarSincronizacion();
     },
     
     // ===== ESTADO DE CONEXIÓN =====
@@ -236,7 +236,6 @@ const App = {
         }
     },
     
-    // ===== SINCRONIZACIÓN COMPLETA =====
     async sincronizarTodo() {
         if (!this.online) return;
         
@@ -258,24 +257,33 @@ const App = {
         }
     },
     
-    // ===== CATEGORÍAS OFFLINE =====
+    // ===== CATEGORÍAS =====
     async cargarCategoriasDelServidor() {
         try {
+            console.log('📥 Solicitando categorías al servidor...');
             const response = await fetch(`${API_URL}/api/categorias`);
-            if (!response.ok) throw new Error('Error al cargar categorías');
+            
+            if (!response.ok) {
+                console.error('❌ Error en respuesta del servidor:', response.status);
+                return [];
+            }
             
             const categorias = await response.json();
             console.log('🏷️ Categorías recibidas:', categorias);
             
-            await OfflineDB.guardarCategorias(categorias);
-            
-            if (this.usuario) {
-                await this.cargarCategoriasOffline();
+            if (categorias && categorias.length > 0) {
+                await OfflineDB.guardarCategorias(categorias);
+                
+                if (this.usuario) {
+                    await this.cargarCategoriasOffline();
+                }
+            } else {
+                console.log('⚠️ No se recibieron categorías del servidor');
             }
             
             return categorias;
         } catch (error) {
-            console.error('Error cargando categorías del servidor:', error);
+            console.error('❌ Error cargando categorías del servidor:', error);
             return [];
         }
     },
@@ -284,25 +292,30 @@ const App = {
         try {
             this.categorias = await OfflineDB.cargarCategorias();
             console.log(`🏷️ ${this.categorias.length} categorías cargadas offline`);
+            
+            if (this.categorias.length === 0) {
+                console.log('⚠️ No hay categorías guardadas offline');
+            }
         } catch (error) {
-            console.error('Error cargando categorías offline:', error);
+            console.error('❌ Error cargando categorías offline:', error);
             this.categorias = [];
         }
     },
     
     obtenerNombreCategoria(categoriaId) {
+        if (!categoriaId) return 'General';
         const cat = this.categorias.find(c => c.id === categoriaId);
         return cat ? cat.nombre : 'General';
     },
     
-    // ===== PRODUCTOS OFFLINE =====
+    // ===== PRODUCTOS =====
     async cargarProductosDelServidor() {
         try {
             const response = await fetch(`${API_URL}/api/productos`);
             if (!response.ok) throw new Error('Error al cargar productos');
             
             const productos = await response.json();
-            console.log('📦 Productos recibidos:', productos);
+            console.log('📦 Productos recibidos:', productos.length);
             
             const pendientes = await OfflineDB.obtenerVentasPendientes();
             
@@ -430,26 +443,26 @@ const App = {
             this.mostrarDetallePendientes();
         };
         
-        const forzarBtn = document.createElement('button');
-        forzarBtn.innerHTML = this.online ? '🔄 Sincronizar ahora' : '📱 Esperando conexión...';
-        forzarBtn.style.cssText = `
-            background: ${this.online ? '#27ae60' : '#95a5a6'};
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            cursor: ${this.online ? 'pointer' : 'not-allowed'};
-            font-size: 0.85rem;
-            opacity: ${this.online ? '1' : '0.7'};
-        `;
-        forzarBtn.disabled = !this.online;
-        forzarBtn.onclick = (e) => {
-            e.stopPropagation();
-            if (this.online) this.forzarSincronizacion();
-        };
-        
         botones.appendChild(verBtn);
-        botones.appendChild(forzarBtn);
+        
+        if (this.online) {
+            const forzarBtn = document.createElement('button');
+            forzarBtn.innerHTML = '🔄 Sincronizar ahora';
+            forzarBtn.style.cssText = `
+                background: #27ae60;
+                border: none;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 20px;
+                cursor: pointer;
+                font-size: 0.85rem;
+            `;
+            forzarBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.forzarSincronizacion();
+            };
+            botones.appendChild(forzarBtn);
+        }
         
         banner.appendChild(icono);
         banner.appendChild(texto);
@@ -501,47 +514,6 @@ const App = {
         }
     },
     
-    agregarBotonForzarSincronizacion() {
-        const botonExistente = document.getElementById('forzarSyncBtn');
-        if (botonExistente) botonExistente.remove();
-        
-        const boton = document.createElement('button');
-        boton.id = 'forzarSyncBtn';
-        boton.innerHTML = '🔄 Sincronizar';
-        boton.style.cssText = `
-            position: fixed;
-            bottom: 80px;
-            right: 15px;
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            padding: 10px 20px;
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            z-index: 160;
-            transition: all 0.3s ease;
-            display: ${this.online ? 'flex' : 'none'};
-            align-items: center;
-            gap: 8px;
-        `;
-        boton.onclick = () => this.forzarSincronizacion();
-        
-        boton.addEventListener('mouseenter', () => {
-            boton.style.transform = 'translateY(-2px)';
-            boton.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
-        });
-        
-        boton.addEventListener('mouseleave', () => {
-            boton.style.transform = 'translateY(0)';
-            boton.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
-        });
-        
-        document.body.appendChild(boton);
-    },
-    
     async forzarSincronizacion() {
         if (!this.online) {
             this.mostrarNotificacion('❌ No hay conexión a internet');
@@ -584,7 +556,6 @@ const App = {
                 this.cargarCategoriasOffline();
                 this.actualizarInfoUsuario();
                 this.cargarVentasLocales();
-                this.agregarBotonForzarSincronizacion();
             } catch (e) {
                 this.showLoginPanel();
             }
@@ -630,7 +601,6 @@ const App = {
                 await this.cargarProductosDelServidor();
                 await this.cargarVentasPendientesLocales();
                 this.cargarVentasLocales();
-                this.agregarBotonForzarSincronizacion();
                 this.showError('', 'clear');
                 
                 this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
@@ -654,9 +624,6 @@ const App = {
             this.carrito = [];
             this.showLoginPanel();
             this.mostrarNotificacion('👋 Sesión cerrada');
-            
-            const botonSync = document.getElementById('forzarSyncBtn');
-            if (botonSync) botonSync.remove();
         }
     },
     
@@ -1029,10 +996,7 @@ const App = {
         if (!this.online || this.sincronizando) return;
         
         const pendientes = await OfflineDB.obtenerVentasPendientes();
-        if (pendientes.length === 0) {
-            this.mostrarNotificacion('✅ No hay ventas pendientes');
-            return;
-        }
+        if (pendientes.length === 0) return;
         
         this.sincronizando = true;
         this.actualizarEstadoConexion();
@@ -1041,7 +1005,6 @@ const App = {
         this.mostrarNotificacion(`🔄 Sincronizando ${pendientes.length} ventas...`);
         
         let sincronizadas = 0;
-        let fallidas = 0;
         
         for (const venta of pendientes) {
             try {
@@ -1074,7 +1037,6 @@ const App = {
                 
             } catch (error) {
                 console.error('Error sincronizando venta:', venta.id, error);
-                fallidas++;
             }
         }
         
@@ -1086,12 +1048,11 @@ const App = {
         this.actualizarEstadoConexion();
         
         if (sincronizadas > 0) {
-            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente${fallidas > 0 ? ` (${fallidas} fallidas)` : ''}`);
+            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente`);
             await this.cargarVentasLocales();
             this.renderizarProductos();
             this.cargarInventario();
             this.actualizarVistasPendientes();
-            this.agregarBotonForzarSincronizacion();
         }
     },
     
@@ -1382,58 +1343,4 @@ const App = {
     },
     
     // ===== NOTIFICACIONES =====
-    mostrarNotificacion(mensaje) {
-        const notif = document.getElementById('notification');
-        if (notif) {
-            notif.style.display = 'block';
-            notif.textContent = mensaje;
-            setTimeout(() => {
-                notif.style.display = 'none';
-            }, 3000);
-        }
-    },
-    
-    // ===== PANELES =====
-    showLoginPanel() {
-        const loginPanel = document.getElementById('loginPanel');
-        const ventaPanel = document.getElementById('ventaPanel');
-        
-        if (loginPanel) {
-            loginPanel.style.display = 'block';
-            setTimeout(() => loginPanel.classList.add('visible'), 50);
-        }
-        if (ventaPanel) ventaPanel.style.display = 'none';
-    },
-    
-    showVentaPanel() {
-        const loginPanel = document.getElementById('loginPanel');
-        const ventaPanel = document.getElementById('ventaPanel');
-        
-        if (loginPanel) {
-            loginPanel.style.display = 'none';
-            loginPanel.classList.remove('visible');
-        }
-        if (ventaPanel) ventaPanel.style.display = 'block';
-    },
-    
-    showError(message, type = 'error') {
-        const errorDiv = document.getElementById('loginError');
-        if (errorDiv) {
-            if (type === 'clear') {
-                errorDiv.style.display = 'none';
-                errorDiv.textContent = '';
-            } else {
-                errorDiv.style.display = 'block';
-                errorDiv.textContent = message;
-            }
-        }
-    }
-};
-
-// ===== HACER APP ACCESIBLE GLOBALMENTE =====
-window.App = App;
-
-// ===== INICIAR APP =====
-document.addEventListener('DOMContentLoaded', () => {
-    App.init();
-});
+   
