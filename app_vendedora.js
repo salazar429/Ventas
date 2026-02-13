@@ -1,11 +1,11 @@
 // ===========================================
 // APP VENDEDORA - OFFLINE FIRST CON SINCRONIZACIÓN
-// STOCK ACTUALIZADO CORRECTAMENTE EN VENTAS
+// VERSIÓN FINAL CON CATEGORÍAS Y PENDIENTES MEJORADOS
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
 const DB_NAME = 'FacturacionDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incrementar versión para nuevos stores
 
 // ========== INDEXEDDB PARA ALMACENAMIENTO OFFLINE ==========
 class OfflineDB {
@@ -19,15 +19,23 @@ class OfflineDB {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 
+                // Store para categorías
+                if (!db.objectStoreNames.contains('categorias')) {
+                    db.createObjectStore('categorias', { keyPath: 'id' });
+                }
+                
                 // Store para productos
                 if (!db.objectStoreNames.contains('productos')) {
                     const storeProductos = db.createObjectStore('productos', { keyPath: 'id' });
                     storeProductos.createIndex('nombre', 'nombre', { unique: false });
+                    storeProductos.createIndex('categoria', 'categoria', { unique: false });
                 }
                 
                 // Store para ventas pendientes
                 if (!db.objectStoreNames.contains('ventas_pendientes')) {
-                    db.createObjectStore('ventas_pendientes', { keyPath: 'id' });
+                    const storePendientes = db.createObjectStore('ventas_pendientes', { keyPath: 'id' });
+                    storePendientes.createIndex('fecha', 'fecha', { unique: false });
+                    storePendientes.createIndex('sincronizada', 'sincronizada', { unique: false });
                 }
                 
                 // Store para ventas completadas
@@ -35,6 +43,35 @@ class OfflineDB {
                     db.createObjectStore('ventas_completadas', { keyPath: 'id' });
                 }
             };
+        });
+    }
+    
+    static async guardarCategorias(categorias) {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('categorias', 'readwrite');
+            const store = tx.objectStore('categorias');
+            
+            store.clear();
+            categorias.forEach(c => store.put(c));
+            
+            tx.oncomplete = () => {
+                console.log('✅ Categorías guardadas offline');
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+    
+    static async cargarCategorias() {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('categorias', 'readonly');
+            const store = tx.objectStore('categorias');
+            const request = store.getAll();
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
         });
     }
     
@@ -137,8 +174,10 @@ const App = {
     usuario: null,
     currentPage: 'dashboard',
     productos: [],
+    categorias: [],
     carrito: [],
     ventas: [],
+    ventasPendientes: [],
     categoriaActiva: 'todos',
     online: navigator.onLine,
     sincronizando: false,
@@ -146,7 +185,9 @@ const App = {
     async init() {
         console.log('🚀 Iniciando App Vendedora');
         this.setupConnectionListener();
+        await this.cargarCategoriasOffline();
         await this.cargarProductosOffline();
+        await this.cargarVentasPendientesLocales();
         this.hideSplashScreen();
         this.checkLogin();
         this.setupEventListeners();
@@ -155,6 +196,7 @@ const App = {
         this.setupFloatingButton();
         this.setupSearchAndFilters();
         this.setupReportes();
+        this.setupPendientesClick();
     },
     
     // ===== ESTADO DE CONEXIÓN =====
@@ -164,12 +206,14 @@ const App = {
             this.actualizarEstadoConexion();
             this.mostrarNotificacion('📶 Conexión restablecida');
             this.sincronizarVentasPendientes();
+            this.actualizarVistasPendientes();
         });
         
         window.addEventListener('offline', () => {
             this.online = false;
             this.actualizarEstadoConexion();
             this.mostrarNotificacion('📴 Sin conexión - Modo offline');
+            this.actualizarVistasPendientes();
         });
     },
     
@@ -206,6 +250,7 @@ const App = {
                 const data = await response.json();
                 console.log(`✅ Servidor OK - ${data.productos} productos, ${data.vendedoras} vendedoras`);
                 
+                await this.cargarCategoriasDelServidor();
                 await this.cargarProductosDelServidor();
                 await this.sincronizarVentasPendientes();
             }
@@ -217,17 +262,49 @@ const App = {
         }
     },
     
+    // ===== CATEGORÍAS OFFLINE =====
+    async cargarCategoriasDelServidor() {
+        try {
+            const response = await fetch(`${API_URL}/api/categorias`);
+            const categorias = await response.json();
+            
+            await OfflineDB.guardarCategorias(categorias);
+            
+            if (this.usuario) {
+                await this.cargarCategoriasOffline();
+            }
+            
+            return categorias;
+        } catch (error) {
+            console.error('Error cargando categorías del servidor:', error);
+            return [];
+        }
+    },
+    
+    async cargarCategoriasOffline() {
+        try {
+            this.categorias = await OfflineDB.cargarCategorias();
+            console.log(`🏷️ ${this.categorias.length} categorías cargadas offline`);
+        } catch (error) {
+            console.error('Error cargando categorías offline:', error);
+            this.categorias = [];
+        }
+    },
+    
+    obtenerNombreCategoria(categoriaId) {
+        const cat = this.categorias.find(c => c.id === categoriaId);
+        return cat ? cat.nombre : 'General';
+    },
+    
     // ===== PRODUCTOS OFFLINE =====
     async cargarProductosDelServidor() {
         try {
-            const response = await fetch(`${API_URL}/api/dueno/productos`);
+            const response = await fetch(`${API_URL}/api/productos`);
             const productos = await response.json();
             
-            // Obtener ventas pendientes para calcular stock real
             const pendientes = await OfflineDB.obtenerVentasPendientes();
             
             if (pendientes.length > 0) {
-                // Calcular stock real: stock servidor - ventas pendientes
                 const productosActualizados = productos.map(p => {
                     let stockRestado = 0;
                     pendientes.forEach(v => {
@@ -273,6 +350,118 @@ const App = {
         }
     },
     
+    // ===== VENTAS PENDIENTES =====
+    async cargarVentasPendientesLocales() {
+        try {
+            this.ventasPendientes = await OfflineDB.obtenerVentasPendientes();
+            this.actualizarVistasPendientes();
+            console.log(`⏳ ${this.ventasPendientes.length} ventas pendientes cargadas`);
+        } catch (error) {
+            console.error('Error cargando ventas pendientes:', error);
+            this.ventasPendientes = [];
+        }
+    },
+    
+    actualizarVistasPendientes() {
+        // Actualizar contador en dashboard
+        const pendienteCount = document.getElementById('pendienteCount');
+        if (pendienteCount) {
+            pendienteCount.textContent = this.ventasPendientes.length;
+        }
+        
+        // Mostrar/ocultar banner de pendientes
+        this.mostrarBannerPendientes();
+    },
+    
+    mostrarBannerPendientes() {
+        // Eliminar banner existente si hay
+        const bannerExistente = document.getElementById('pendientesBanner');
+        if (bannerExistente) bannerExistente.remove();
+        
+        if (this.ventasPendientes.length === 0) return;
+        
+        const banner = document.createElement('div');
+        banner.id = 'pendientesBanner';
+        banner.style.cssText = `
+            background: #f39c12;
+            color: white;
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--box-shadow);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        `;
+        banner.onclick = () => this.mostrarDetallePendientes();
+        
+        const icono = document.createElement('span');
+        icono.innerHTML = '⏳';
+        icono.style.fontSize = '1.5rem';
+        icono.style.marginRight = '12px';
+        
+        const texto = document.createElement('div');
+        texto.style.flex = '1';
+        texto.innerHTML = `
+            <strong style="font-size: 1rem;">${this.ventasPendientes.length} venta${this.ventasPendientes.length !== 1 ? 's' : ''} pendiente${this.ventasPendientes.length !== 1 ? 's' : ''}</strong><br>
+            <small>${this.online ? 'Pendientes de sincronizar' : 'Sin conexión - Se realizarán al reconectar'}</small>
+        `;
+        
+        const verBtn = document.createElement('span');
+        verBtn.innerHTML = '👁️ Ver';
+        verBtn.style.cssText = `
+            background: rgba(255,255,255,0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-left: 12px;
+        `;
+        
+        banner.appendChild(icono);
+        banner.appendChild(texto);
+        banner.appendChild(verBtn);
+        
+        // Insertar después del header
+        const header = document.querySelector('header');
+        if (header) {
+            header.insertAdjacentElement('afterend', banner);
+        }
+    },
+    
+    mostrarDetallePendientes() {
+        if (this.ventasPendientes.length === 0) {
+            this.mostrarNotificacion('No hay ventas pendientes');
+            return;
+        }
+        
+        let mensaje = '📋 VENTAS PENDIENTES:\n\n';
+        let total = 0;
+        
+        this.ventasPendientes.forEach((v, index) => {
+            mensaje += `${index + 1}. ${v.cliente}\n`;
+            v.productos.forEach(p => {
+                mensaje += `   • ${p.nombre} x${p.cantidad} = $${(p.precio * p.cantidad).toFixed(2)}\n`;
+            });
+            mensaje += `   Total: $${v.total.toFixed(2)}\n\n`;
+            total += v.total;
+        });
+        
+        mensaje += `💰 TOTAL PENDIENTE: $${total.toFixed(2)}\n`;
+        mensaje += `📡 Estado: ${this.online ? 'Listas para sincronizar' : 'Esperando conexión'}`;
+        
+        alert(mensaje);
+    },
+    
+    setupPendientesClick() {
+        const pendienteCard = document.getElementById('pendienteCount')?.parentElement?.parentElement;
+        if (pendienteCard) {
+            pendienteCard.addEventListener('click', () => this.mostrarDetallePendientes());
+            pendienteCard.style.cursor = 'pointer';
+        }
+    },
+    
     // ===== SPLASH SCREEN =====
     hideSplashScreen() {
         setTimeout(() => {
@@ -298,6 +487,7 @@ const App = {
                 this.usuario = JSON.parse(savedUser);
                 this.showVentaPanel();
                 this.cargarProductosOffline();
+                this.cargarCategoriasOffline();
                 this.actualizarInfoUsuario();
                 this.cargarVentasLocales();
             } catch (e) {
@@ -341,7 +531,9 @@ const App = {
                 
                 this.actualizarInfoUsuario();
                 this.showVentaPanel();
+                await this.cargarCategoriasDelServidor();
                 await this.cargarProductosDelServidor();
+                await this.cargarVentasPendientesLocales();
                 this.cargarVentasLocales();
                 this.showError('', 'clear');
                 
@@ -502,7 +694,8 @@ const App = {
                 nombre: producto.nombre,
                 precio: producto.precio,
                 cantidad: cantidad,
-                stock: producto.stock
+                stock: producto.stock,
+                categoria: producto.categoria
             });
         }
         
@@ -601,11 +794,13 @@ const App = {
             const stockText = p.stock === 0 ? 'out-of-stock' : '';
             const disabled = p.stock === 0 ? 'disabled' : '';
             const maxStock = p.stock;
+            const categoriaNombre = this.obtenerNombreCategoria(p.categoria);
             
             html += `
                 <div class="product-card ${stockClass} ${stockText}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
                     <div class="product-icon">📦</div>
                     <div class="product-name">${p.nombre}</div>
+                    <div style="font-size: 0.7rem; color: #666; margin-bottom: 4px;">🏷️ ${categoriaNombre}</div>
                     <div class="product-price">$${p.precio.toFixed(2)}</div>
                     <div class="product-stock">Stock: ${p.stock} uds</div>
                     <div class="product-actions">
@@ -669,7 +864,8 @@ const App = {
                         body: JSON.stringify({
                             nombre: producto.nombre,
                             precio: producto.precio,
-                            stock: nuevoStock
+                            stock: nuevoStock,
+                            categoria: producto.categoria
                         })
                     });
                     
@@ -705,6 +901,7 @@ const App = {
         } else {
             // ===== MODO OFFLINE - GUARDAR VENTA PENDIENTE =====
             await OfflineDB.guardarVentaPendiente(venta);
+            this.ventasPendientes.push(venta);
             this.mostrarNotificacion(`⏳ Venta guardada offline - Se sincronizará automáticamente`);
             
             for (const item of this.carrito) {
@@ -717,6 +914,7 @@ const App = {
             await OfflineDB.guardarProductos(this.productos);
             this.renderizarProductos();
             this.cargarInventario();
+            this.actualizarVistasPendientes();
             
             const ventasHoy = document.getElementById('ventasHoyCount');
             if (ventasHoy) ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
@@ -763,7 +961,8 @@ const App = {
                             body: JSON.stringify({
                                 nombre: producto.nombre,
                                 precio: producto.precio,
-                                stock: nuevoStock
+                                stock: nuevoStock,
+                                categoria: producto.categoria
                             })
                         });
                     }
@@ -780,7 +979,12 @@ const App = {
             }
         }
         
+        // Recargar productos y categorías del servidor
+        await this.cargarCategoriasDelServidor();
         await this.cargarProductosDelServidor();
+        
+        // Actualizar ventas pendientes locales
+        await this.cargarVentasPendientesLocales();
         
         this.sincronizando = false;
         this.actualizarEstadoConexion();
@@ -810,27 +1014,35 @@ const App = {
         const container = document.getElementById('ventasRecientesContainer');
         if (!container) return;
         
-        if (this.ventas.length === 0) {
+        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
             container.innerHTML = '<div class="empty-message" style="padding: 1.5rem;">No hay ventas registradas aún</div>';
             return;
         }
         
-        const recientes = [...this.ventas].reverse().slice(0, 5);
+        // Combinar ventas completadas y pendientes para mostrar
+        const todasVentas = [
+            ...this.ventasPendientes.map(v => ({...v, estado: 'pendiente'})),
+            ...this.ventas
+        ];
+        
+        const recientes = [...todasVentas].reverse().slice(0, 5);
         
         let html = '';
         recientes.forEach(v => {
             const fecha = new Date(v.fecha);
             const fechaStr = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
+            const estadoClass = v.estado === 'pendiente' ? 'status-warning' : 'status-completed';
+            const estadoText = v.estado === 'pendiente' ? 'Pendiente' : 'Completada';
             
             html += `
-                <div class="history-item">
+                <div class="history-item" style="${v.estado === 'pendiente' ? 'border-left: 4px solid #f39c12;' : ''}">
                     <div>
                         <div style="font-weight: 600;">${v.cliente}</div>
                         <div style="font-size: 0.75rem; color: #666;">${fechaStr}</div>
                     </div>
                     <div>${v.productos.reduce((sum, i) => sum + i.cantidad, 0)} productos</div>
                     <div style="font-weight: bold; color: var(--accent-color);">$${v.total.toFixed(2)}</div>
-                    <div><span class="status status-completed">Completada</span></div>
+                    <div><span class="status ${estadoClass}">${estadoText}</span></div>
                 </div>
             `;
         });
@@ -844,7 +1056,7 @@ const App = {
         const avgSaleAmount = document.getElementById('avgSaleAmount');
         const totalSalesCount = document.getElementById('totalSalesCount');
         
-        if (this.ventas.length === 0) {
+        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
             if (container) container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
             if (totalSalesAmount) totalSalesAmount.textContent = '$0.00';
             if (avgSaleAmount) avgSaleAmount.textContent = '$0.00';
@@ -853,26 +1065,34 @@ const App = {
         }
         
         const total = this.ventas.reduce((sum, v) => sum + v.total, 0);
-        const promedio = total / this.ventas.length;
+        const totalPendiente = this.ventasPendientes.reduce((sum, v) => sum + v.total, 0);
+        const promedio = this.ventas.length > 0 ? total / this.ventas.length : 0;
         
-        if (totalSalesAmount) totalSalesAmount.textContent = `$${total.toFixed(2)}`;
+        if (totalSalesAmount) totalSalesAmount.textContent = `$${(total + totalPendiente).toFixed(2)}`;
         if (avgSaleAmount) avgSaleAmount.textContent = `$${promedio.toFixed(2)}`;
         if (totalSalesCount) totalSalesCount.textContent = this.ventas.length;
         
+        const todasVentas = [
+            ...this.ventasPendientes.map(v => ({...v, estado: 'pendiente'})),
+            ...this.ventas
+        ];
+        
         let html = '';
-        [...this.ventas].reverse().forEach(v => {
+        [...todasVentas].reverse().forEach(v => {
             const fecha = new Date(v.fecha);
             const fechaStr = fecha.toLocaleDateString() + ' ' + fecha.toLocaleTimeString();
+            const estadoClass = v.estado === 'pendiente' ? 'status-warning' : 'status-completed';
+            const estadoText = v.estado === 'pendiente' ? 'Pendiente' : 'Completada';
             
             html += `
-                <div class="history-item">
+                <div class="history-item" style="${v.estado === 'pendiente' ? 'border-left: 4px solid #f39c12; background: #fff3e0;' : ''}">
                     <div>
                         <div style="font-weight: 600;">${v.cliente}</div>
                         <div style="font-size: 0.75rem; color: #666;">${fechaStr}</div>
                     </div>
                     <div>${v.productos.reduce((sum, i) => sum + i.cantidad, 0)} productos</div>
                     <div style="font-weight: bold; color: var(--accent-color);">$${v.total.toFixed(2)}</div>
-                    <div><span class="status status-completed">Completada</span></div>
+                    <div><span class="status ${estadoClass}">${estadoText}</span></div>
                 </div>
             `;
         });
@@ -901,6 +1121,7 @@ const App = {
         this.productos.forEach(p => {
             let estado = 'Disponible';
             let estadoClass = '';
+            const categoriaNombre = this.obtenerNombreCategoria(p.categoria);
             
             if (p.stock === 0) {
                 estado = 'Agotado';
@@ -913,7 +1134,7 @@ const App = {
             html += `
                 <tr>
                     <td>${p.nombre}</td>
-                    <td>${p.categoria || 'General'}</td>
+                    <td>${categoriaNombre}</td>
                     <td>$${p.precio.toFixed(2)}</td>
                     <td>${p.stock}</td>
                     <td><span class="${estadoClass}">${estado}</span></td>
@@ -984,7 +1205,11 @@ const App = {
             return v.fecha.split('T')[0] === fecha;
         });
         
-        if (ventasDelDia.length === 0) {
+        const pendientesDelDia = this.ventasPendientes.filter(v => {
+            return v.fecha.split('T')[0] === fecha;
+        });
+        
+        if (ventasDelDia.length === 0 && pendientesDelDia.length === 0) {
             if (dailyTotal) dailyTotal.textContent = '$0.00';
             if (dailySalesCount) dailySalesCount.textContent = '0';
             if (dailyAvg) dailyAvg.textContent = '$0.00';
@@ -996,36 +1221,39 @@ const App = {
         }
         
         const total = ventasDelDia.reduce((sum, v) => sum + v.total, 0);
-        const promedio = total / ventasDelDia.length;
+        const totalPendiente = pendientesDelDia.reduce((sum, v) => sum + v.total, 0);
+        const promedio = ventasDelDia.length > 0 ? total / ventasDelDia.length : 0;
         
-        if (dailyTotal) dailyTotal.textContent = `$${total.toFixed(2)}`;
+        if (dailyTotal) dailyTotal.textContent = `$${(total + totalPendiente).toFixed(2)}`;
         if (dailySalesCount) dailySalesCount.textContent = ventasDelDia.length;
         if (dailyAvg) dailyAvg.textContent = `$${promedio.toFixed(2)}`;
         
         if (categorySales) {
             categorySales.innerHTML = `
-                <div class="category-sale-item">
-                    <span>Ropa</span>
-                    <span style="font-weight: bold;">$0.00</span>
+                <div class="category-sale-item" style="color: #f39c12;">
+                    <span>⏳ Pendientes:</span>
+                    <span style="font-weight: bold;">$${totalPendiente.toFixed(2)}</span>
                 </div>
-                <div class="category-sale-item">
-                    <span>Electrónica</span>
-                    <span style="font-weight: bold;">$0.00</span>
-                </div>
+                ${this.categorias.map(c => `
+                    <div class="category-sale-item">
+                        <span>${c.nombre}</span>
+                        <span style="font-weight: bold;">$0.00</span>
+                    </div>
+                `).join('')}
             `;
         }
         
         if (bestProduct) bestProduct.textContent = this.productos[0]?.nombre || '-';
         if (bestHour) bestHour.textContent = '15:00 - 17:00';
-        if (topCategory) topCategory.textContent = 'Ropa';
+        if (topCategory) topCategory.textContent = this.categorias[0]?.nombre || '-';
         
-        this.mostrarNotificacion(`📊 Reporte generado para ${fecha}`);
+        this.mostrarNotificacion(`📊 Reporte generado para ${fecha} (${pendientesDelDia.length} pendientes)`);
     },
     
     // ===== DASHBOARD =====
     actualizarDashboard() {
         const pendienteCount = document.getElementById('pendienteCount');
-        if (pendienteCount) pendienteCount.textContent = this.ventas.length;
+        if (pendienteCount) pendienteCount.textContent = this.ventasPendientes.length;
         
         const totalProductosSpan = document.getElementById('totalProductosCount');
         if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
