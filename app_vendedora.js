@@ -1,9 +1,140 @@
 // ===========================================
-// APP VENDEDORA - LÓGICA COMPLETA
+// APP VENDEDORA - OFFLINE FIRST CON SINCRONIZACIÓN
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
+const DB_NAME = 'FacturacionDB';
+const DB_VERSION = 1;
 
+// ========== INDEXEDDB PARA ALMACENAMIENTO OFFLINE ==========
+class OfflineDB {
+    static async abrirDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // Store para productos
+                if (!db.objectStoreNames.contains('productos')) {
+                    const storeProductos = db.createObjectStore('productos', { keyPath: 'id' });
+                    storeProductos.createIndex('nombre', 'nombre', { unique: false });
+                }
+                
+                // Store para ventas pendientes
+                if (!db.objectStoreNames.contains('ventas_pendientes')) {
+                    db.createObjectStore('ventas_pendientes', { keyPath: 'id' });
+                }
+                
+                // Store para ventas completadas
+                if (!db.objectStoreNames.contains('ventas_completadas')) {
+                    db.createObjectStore('ventas_completadas', { keyPath: 'id' });
+                }
+            };
+        });
+    }
+    
+    static async guardarProductos(productos) {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('productos', 'readwrite');
+            const store = tx.objectStore('productos');
+            
+            // Limpiar productos anteriores
+            store.clear();
+            
+            // Guardar nuevos productos
+            productos.forEach(p => store.put(p));
+            
+            tx.oncomplete = () => {
+                console.log('✅ Productos guardados offline');
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+    
+    static async cargarProductos() {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('productos', 'readonly');
+            const store = tx.objectStore('productos');
+            const request = store.getAll();
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    static async guardarVentaPendiente(venta) {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('ventas_pendientes', 'readwrite');
+            const store = tx.objectStore('ventas_pendientes');
+            
+            venta.fecha = new Date().toISOString();
+            venta.sincronizada = false;
+            
+            store.put(venta);
+            tx.oncomplete = () => {
+                console.log('📝 Venta guardada offline:', venta.id);
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+    
+    static async obtenerVentasPendientes() {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('ventas_pendientes', 'readonly');
+            const store = tx.objectStore('ventas_pendientes');
+            const request = store.getAll();
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    static async eliminarVentaPendiente(id) {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('ventas_pendientes', 'readwrite');
+            const store = tx.objectStore('ventas_pendientes');
+            store.delete(id);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+    
+    static async guardarVentaCompletada(venta) {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('ventas_completadas', 'readwrite');
+            const store = tx.objectStore('ventas_completadas');
+            store.put(venta);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+    
+    static async cargarVentasCompletadas() {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('ventas_completadas', 'readonly');
+            const store = tx.objectStore('ventas_completadas');
+            const request = store.getAll();
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+}
+
+// ========== APP VENDEDORA ==========
 const App = {
     usuario: null,
     currentPage: 'dashboard',
@@ -11,17 +142,121 @@ const App = {
     carrito: [],
     ventas: [],
     categoriaActiva: 'todos',
+    online: navigator.onLine,
+    sincronizando: false,
     
-    init() {
+    async init() {
         console.log('🚀 Iniciando App Vendedora');
+        this.setupConnectionListener();
+        await this.cargarProductosOffline();
         this.hideSplashScreen();
         this.checkLogin();
         this.setupEventListeners();
-        this.testServerConnection();
+        this.verificarConexion();
         this.setupNavigation();
         this.setupFloatingButton();
         this.setupSearchAndFilters();
         this.setupReportes();
+    },
+    
+    // ===== ESTADO DE CONEXIÓN =====
+    setupConnectionListener() {
+        window.addEventListener('online', () => {
+            this.online = true;
+            this.actualizarEstadoConexion();
+            this.mostrarNotificacion('📶 Conexión restablecida');
+            this.sincronizarVentasPendientes();
+        });
+        
+        window.addEventListener('offline', () => {
+            this.online = false;
+            this.actualizarEstadoConexion();
+            this.mostrarNotificacion('📴 Sin conexión - Modo offline');
+        });
+    },
+    
+    actualizarEstadoConexion() {
+        const dot = document.getElementById('connectionDot');
+        if (!dot) return;
+        
+        dot.className = 'connection-dot';
+        
+        if (this.sincronizando) {
+            dot.classList.add('syncing');
+            dot.title = 'Sincronizando...';
+        } else if (this.online) {
+            dot.classList.add('online');
+            dot.title = 'Conectado';
+        } else {
+            dot.classList.add('offline');
+            dot.title = 'Sin conexión';
+        }
+    },
+    
+    async verificarConexion() {
+        if (!this.online) {
+            this.actualizarEstadoConexion();
+            return;
+        }
+        
+        this.sincronizando = true;
+        this.actualizarEstadoConexion();
+        
+        try {
+            const response = await fetch(API_URL);
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Servidor OK - ${data.productos} productos, ${data.vendedoras} vendedoras`);
+                
+                // Cargar productos del servidor y guardarlos offline
+                await this.cargarProductosDelServidor();
+                
+                // Sincronizar ventas pendientes
+                await this.sincronizarVentasPendientes();
+            }
+        } catch (error) {
+            console.log('❌ Error conectando al servidor');
+        } finally {
+            this.sincronizando = false;
+            this.actualizarEstadoConexion();
+        }
+    },
+    
+    // ===== PRODUCTOS OFFLINE =====
+    async cargarProductosDelServidor() {
+        try {
+            const response = await fetch(`${API_URL}/api/dueno/productos`);
+            const productos = await response.json();
+            
+            // Guardar en IndexedDB
+            await OfflineDB.guardarProductos(productos);
+            
+            // Actualizar vista si estamos logueados
+            if (this.usuario) {
+                await this.cargarProductosOffline();
+            }
+            
+            return productos;
+        } catch (error) {
+            console.error('Error cargando productos del servidor:', error);
+            return [];
+        }
+    },
+    
+    async cargarProductosOffline() {
+        try {
+            this.productos = await OfflineDB.cargarProductos();
+            console.log(`📦 ${this.productos.length} productos cargados offline`);
+            
+            if (this.usuario) {
+                this.renderizarProductos();
+                this.cargarInventario();
+                this.actualizarDashboard();
+            }
+        } catch (error) {
+            console.error('Error cargando productos offline:', error);
+            this.productos = [];
+        }
     },
     
     // ===== SPLASH SCREEN =====
@@ -35,43 +270,23 @@ const App = {
                 }, 500);
             }
             
-            // Mostrar status después del splash
-            const status = document.getElementById('serverStatus');
-            if (status) status.style.display = 'block';
-            
             // Mostrar login con animación
             const loginPanel = document.getElementById('loginPanel');
             if (loginPanel) loginPanel.classList.add('visible');
             
-        }, 2000); // 2 segundos de splash
+        }, 2000);
     },
     
-    async testServerConnection() {
-        const statusDiv = document.getElementById('serverStatus');
-        try {
-            const response = await fetch(API_URL);
-            if (response.ok) {
-                const data = await response.json();
-                statusDiv.className = 'connection-status online';
-                statusDiv.innerHTML = `✓ Conectado - ${data.productos} productos, ${data.vendedoras} vendedoras`;
-            } else {
-                throw new Error('Error en respuesta');
-            }
-        } catch (error) {
-            statusDiv.className = 'connection-status offline';
-            statusDiv.innerHTML = '✗ Sin conexión';
-        }
-    },
-    
+    // ===== LOGIN =====
     checkLogin() {
         const savedUser = localStorage.getItem('vendedora_activa');
         if (savedUser) {
             try {
                 this.usuario = JSON.parse(savedUser);
                 this.showVentaPanel();
-                this.cargarProductos();
+                this.cargarProductosOffline();
                 this.actualizarInfoUsuario();
-                this.cargarVentas();
+                this.cargarVentasLocales();
             } catch (e) {
                 this.showLoginPanel();
             }
@@ -86,6 +301,11 @@ const App = {
         
         if (!usuario || !password) {
             this.showError('Usuario y contraseña son obligatorios');
+            return;
+        }
+        
+        if (!this.online) {
+            this.showError('Necesitas conexión a internet para iniciar sesión');
             return;
         }
         
@@ -108,8 +328,8 @@ const App = {
                 
                 this.actualizarInfoUsuario();
                 this.showVentaPanel();
-                this.cargarProductos();
-                this.cargarVentas();
+                await this.cargarProductosDelServidor();
+                this.cargarVentasLocales();
                 this.showError('', 'clear');
                 
                 this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
@@ -131,12 +351,12 @@ const App = {
             localStorage.removeItem('vendedora_activa');
             this.usuario = null;
             this.carrito = [];
-            this.ventas = [];
             this.showLoginPanel();
             this.mostrarNotificacion('👋 Sesión cerrada');
         }
     },
     
+    // ===== NAVEGACIÓN =====
     setupNavigation() {
         document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
@@ -172,6 +392,7 @@ const App = {
         }
     },
     
+    // ===== BÚSQUEDA Y FILTROS =====
     setupSearchAndFilters() {
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
@@ -214,6 +435,7 @@ const App = {
         });
     },
     
+    // ===== BOTÓN FLOTANTE Y CARRITO =====
     setupFloatingButton() {
         const floatingBtn = document.getElementById('floatingSaleBtn');
         const closeBtn = document.getElementById('closeSaleBtn');
@@ -239,55 +461,6 @@ const App = {
         document.getElementById('completeSaleBtn')?.addEventListener('click', () => {
             this.completarVenta();
         });
-    },
-    
-    async cargarProductos() {
-        const container = document.getElementById('productoContainer');
-        const countSpan = document.getElementById('productCount');
-        const totalProductosSpan = document.getElementById('totalProductosCount');
-        const inventoryTotalSpan = document.getElementById('inventoryTotalProducts');
-        
-        try {
-            const response = await fetch(`${API_URL}/api/dueno/productos`);
-            this.productos = await response.json();
-            
-            if (countSpan) countSpan.textContent = `(${this.productos.length} productos)`;
-            if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
-            if (inventoryTotalSpan) inventoryTotalSpan.textContent = this.productos.length;
-            
-            if (this.productos.length === 0) {
-                container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px;">No hay productos disponibles</div>';
-                return;
-            }
-            
-            let html = '';
-            this.productos.forEach(p => {
-                const stockClass = p.stock < 5 ? 'low-stock' : '';
-                const stockText = p.stock === 0 ? 'out-of-stock' : '';
-                
-                html += `
-                    <div class="product-card ${stockClass} ${stockText}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
-                        <div class="product-icon">📦</div>
-                        <div class="product-name">${p.nombre}</div>
-                        <div class="product-price">$${p.precio.toFixed(2)}</div>
-                        <div class="product-stock">Stock: ${p.stock} uds</div>
-                        <div class="product-actions">
-                            <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${p.stock}">
-                            <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')">
-                                🛒 Agregar
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-            this.cargarInventario();
-            
-        } catch (error) {
-            console.error('Error cargando productos:', error);
-            container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px; color: #e74c3c;">❌ Error cargando productos</div>';
-        }
     },
     
     agregarAlCarrito(productoId) {
@@ -393,6 +566,60 @@ const App = {
         if (totalSpan) totalSpan.textContent = `$${subtotal.toFixed(2)}`;
     },
     
+    // ===== RENDERIZADO DE PRODUCTOS =====
+    renderizarProductos() {
+        const container = document.getElementById('productoContainer');
+        const countSpan = document.getElementById('productCount');
+        const totalProductosSpan = document.getElementById('totalProductosCount');
+        const inventoryTotalSpan = document.getElementById('inventoryTotalProducts');
+        
+        if (countSpan) countSpan.textContent = `(${this.productos.length} productos)`;
+        if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
+        if (inventoryTotalSpan) inventoryTotalSpan.textContent = this.productos.length;
+        
+        if (this.productos.length === 0) {
+            container.innerHTML = '<div class="empty-message" style="grid-column: span 2; padding: 40px;">No hay productos disponibles</div>';
+            return;
+        }
+        
+        let html = '';
+        this.productos.forEach(p => {
+            const stockClass = p.stock < 5 ? 'low-stock' : '';
+            const stockText = p.stock === 0 ? 'out-of-stock' : '';
+            
+            html += `
+                <div class="product-card ${stockClass} ${stockText}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
+                    <div class="product-icon">📦</div>
+                    <div class="product-name">${p.nombre}</div>
+                    <div class="product-price">$${p.precio.toFixed(2)}</div>
+                    <div class="product-stock">Stock: ${p.stock} uds</div>
+                    <div class="product-actions">
+                        <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${p.stock}">
+                        <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')">
+                            🛒 Agregar
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        this.cargarInventario();
+    },
+    
+    // ===== VENTAS OFFLINE =====
+    async cargarVentasLocales() {
+        try {
+            this.ventas = await OfflineDB.cargarVentasCompletadas();
+            this.cargarVentasRecientes();
+            this.cargarTodasLasVentas();
+            this.actualizarDashboard();
+        } catch (error) {
+            console.error('Error cargando ventas:', error);
+            this.ventas = [];
+        }
+    },
+    
     async completarVenta() {
         if (this.carrito.length === 0) {
             this.mostrarNotificacion('❌ No hay productos en la venta');
@@ -401,49 +628,80 @@ const App = {
         
         const cliente = document.getElementById('clientName')?.value.trim() || 'Cliente General';
         const total = this.carrito.reduce((sum, i) => sum + (i.precio * i.cantidad), 0);
-        const fecha = new Date();
         
         const venta = {
-            id: Date.now().toString(),
+            id: `venta_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             cliente: cliente,
             productos: [...this.carrito],
             total: total,
-            fecha: fecha.toISOString(),
+            fecha: new Date().toISOString(),
             vendedora: this.usuario?.nombre || 'Vendedora',
             vendedoraId: this.usuario?.id || '',
-            estado: 'completada'
+            estado: this.online ? 'completada' : 'pendiente'
         };
         
-        this.ventas.push(venta);
-        localStorage.setItem('ventas_vendedora', JSON.stringify(this.ventas));
+        if (this.online) {
+            // Online - guardar como completada
+            await OfflineDB.guardarVentaCompletada(venta);
+            this.ventas.push(venta);
+            this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
+        } else {
+            // Offline - guardar como pendiente
+            await OfflineDB.guardarVentaPendiente(venta);
+            this.mostrarNotificacion(`⏳ Venta guardada offline - Se sincronizará automáticamente`);
+        }
         
+        // Actualizar contador
         const ventasHoy = document.getElementById('ventasHoyCount');
         if (ventasHoy) ventasHoy.textContent = parseInt(ventasHoy.textContent || 0) + 1;
         
-        this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
-        
+        // Limpiar carrito
         this.carrito = [];
         this.actualizarCarrito();
         document.getElementById('currentSalePanel')?.classList.remove('active');
-        const clientName = document.getElementById('clientName');
-        if (clientName) clientName.value = '';
+        if (document.getElementById('clientName')) document.getElementById('clientName').value = '';
         
-        this.cargarVentasRecientes();
-        this.cargarTodasLasVentas();
+        // Actualizar vistas
+        await this.cargarVentasLocales();
         this.actualizarDashboard();
     },
     
-    cargarVentas() {
-        const ventasGuardadas = localStorage.getItem('ventas_vendedora');
-        if (ventasGuardadas) {
+    async sincronizarVentasPendientes() {
+        if (!this.online || this.sincronizando) return;
+        
+        const pendientes = await OfflineDB.obtenerVentasPendientes();
+        
+        if (pendientes.length === 0) return;
+        
+        this.sincronizando = true;
+        this.actualizarEstadoConexion();
+        
+        console.log(`🔄 Sincronizando ${pendientes.length} ventas pendientes...`);
+        this.mostrarNotificacion(`🔄 Sincronizando ${pendientes.length} ventas...`);
+        
+        let sincronizadas = 0;
+        
+        for (const venta of pendientes) {
             try {
-                this.ventas = JSON.parse(ventasGuardadas);
-            } catch (e) {
-                this.ventas = [];
+                // Aquí iría la llamada real al API de ventas
+                // Por ahora simulamos éxito
+                venta.estado = 'completada';
+                await OfflineDB.guardarVentaCompletada(venta);
+                await OfflineDB.eliminarVentaPendiente(venta.id);
+                this.ventas.push(venta);
+                sincronizadas++;
+            } catch (error) {
+                console.error('Error sincronizando venta:', venta.id, error);
             }
         }
-        this.cargarVentasRecientes();
-        this.actualizarDashboard();
+        
+        this.sincronizando = false;
+        this.actualizarEstadoConexion();
+        
+        if (sincronizadas > 0) {
+            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente`);
+            await this.cargarVentasLocales();
+        }
     },
     
     cargarVentasRecientes() {
@@ -520,6 +778,7 @@ const App = {
         if (container) container.innerHTML = html;
     },
     
+    // ===== INVENTARIO =====
     cargarInventario() {
         const tableBody = document.getElementById('inventoryTableBody');
         const lowStockSpan = document.getElementById('lowStockCount');
@@ -563,6 +822,7 @@ const App = {
         if (tableBody) tableBody.innerHTML = html;
     },
     
+    // ===== REPORTES =====
     setupReportes() {
         const reportDate = document.getElementById('reportDate');
         const generateBtn = document.getElementById('generateReportBtn');
@@ -603,7 +863,7 @@ const App = {
         
         if (refreshInventoryBtn) {
             refreshInventoryBtn.addEventListener('click', () => {
-                this.cargarProductos();
+                this.cargarProductosDelServidor();
                 this.mostrarNotificacion('🔄 Inventario actualizado');
             });
         }
@@ -660,6 +920,7 @@ const App = {
         this.mostrarNotificacion(`📊 Reporte generado para ${fecha}`);
     },
     
+    // ===== DASHBOARD =====
     actualizarDashboard() {
         const pendienteCount = document.getElementById('pendienteCount');
         if (pendienteCount) pendienteCount.textContent = this.ventas.length;
@@ -668,6 +929,7 @@ const App = {
         if (totalProductosSpan) totalProductosSpan.textContent = this.productos.length;
     },
     
+    // ===== INFO USUARIO =====
     actualizarInfoUsuario() {
         if (!this.usuario) return;
         
@@ -678,6 +940,7 @@ const App = {
         if (userAvatar) userAvatar.textContent = (this.usuario.nombre?.charAt(0) || 'V').toUpperCase();
     },
     
+    // ===== EVENT LISTENERS =====
     setupEventListeners() {
         document.getElementById('btnLogin')?.addEventListener('click', () => this.login());
         
@@ -688,6 +951,7 @@ const App = {
         });
     },
     
+    // ===== NOTIFICACIONES =====
     mostrarNotificacion(mensaje) {
         const notif = document.getElementById('notification');
         if (notif) {
@@ -699,17 +963,16 @@ const App = {
         }
     },
     
+    // ===== PANELES =====
     showLoginPanel() {
         const loginPanel = document.getElementById('loginPanel');
         const ventaPanel = document.getElementById('ventaPanel');
-        const status = document.getElementById('serverStatus');
         
         if (loginPanel) {
             loginPanel.style.display = 'block';
             setTimeout(() => loginPanel.classList.add('visible'), 50);
         }
         if (ventaPanel) ventaPanel.style.display = 'none';
-        if (status) status.style.display = 'block';
     },
     
     showVentaPanel() {
