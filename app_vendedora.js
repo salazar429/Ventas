@@ -1,14 +1,13 @@
 // ===========================================
 // APP VENDEDORA - VERSIÓN CORREGIDA
-// SIN BOTÓN FLOTANTE DUPLICADO
-// CON CATEGORÍAS FUNCIONALES
+// CON LIMPIEZA DE CACHE AL INICIAR
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
 const DB_NAME = 'FacturacionDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3; // Incrementar versión para forzar limpieza
 
-// ========== INDEXEDDB ==========
+// ========== INDEXEDDB CON LIMPIEZA ==========
 class OfflineDB {
     static async abrirDB() {
         return new Promise((resolve, reject) => {
@@ -20,25 +19,34 @@ class OfflineDB {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 
-                if (!db.objectStoreNames.contains('categorias')) {
-                    db.createObjectStore('categorias', { keyPath: 'id' });
+                // Eliminar stores antiguos si existen
+                if (db.objectStoreNames.contains('categorias')) {
+                    db.deleteObjectStore('categorias');
+                }
+                if (db.objectStoreNames.contains('productos')) {
+                    db.deleteObjectStore('productos');
+                }
+                if (db.objectStoreNames.contains('ventas_pendientes')) {
+                    db.deleteObjectStore('ventas_pendientes');
+                }
+                if (db.objectStoreNames.contains('ventas_completadas')) {
+                    db.deleteObjectStore('ventas_completadas');
                 }
                 
-                if (!db.objectStoreNames.contains('productos')) {
-                    const storeProductos = db.createObjectStore('productos', { keyPath: 'id' });
-                    storeProductos.createIndex('nombre', 'nombre', { unique: false });
-                    storeProductos.createIndex('categoria', 'categoria', { unique: false });
-                }
+                // Crear nuevos stores
+                db.createObjectStore('categorias', { keyPath: 'id' });
                 
-                if (!db.objectStoreNames.contains('ventas_pendientes')) {
-                    const storePendientes = db.createObjectStore('ventas_pendientes', { keyPath: 'id' });
-                    storePendientes.createIndex('fecha', 'fecha', { unique: false });
-                    storePendientes.createIndex('sincronizada', 'sincronizada', { unique: false });
-                }
+                const storeProductos = db.createObjectStore('productos', { keyPath: 'id' });
+                storeProductos.createIndex('nombre', 'nombre', { unique: false });
+                storeProductos.createIndex('categoria', 'categoria', { unique: false });
                 
-                if (!db.objectStoreNames.contains('ventas_completadas')) {
-                    db.createObjectStore('ventas_completadas', { keyPath: 'id' });
-                }
+                const storePendientes = db.createObjectStore('ventas_pendientes', { keyPath: 'id' });
+                storePendientes.createIndex('fecha', 'fecha', { unique: false });
+                storePendientes.createIndex('sincronizada', 'sincronizada', { unique: false });
+                
+                db.createObjectStore('ventas_completadas', { keyPath: 'id' });
+                
+                console.log('🔄 Base de datos actualizada a versión', DB_VERSION);
             };
         });
     }
@@ -50,7 +58,10 @@ class OfflineDB {
             const store = tx.objectStore('categorias');
             store.clear();
             categorias.forEach(c => store.put(c));
-            tx.oncomplete = resolve;
+            tx.oncomplete = () => {
+                console.log('✅ Categorías guardadas offline:', categorias.length);
+                resolve();
+            };
             tx.onerror = () => reject(tx.error);
         });
     }
@@ -61,7 +72,10 @@ class OfflineDB {
             const tx = db.transaction('categorias', 'readonly');
             const store = tx.objectStore('categorias');
             const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                console.log('📖 Categorías cargadas offline:', request.result.length);
+                resolve(request.result);
+            };
             request.onerror = () => reject(request.error);
         });
     }
@@ -73,7 +87,10 @@ class OfflineDB {
             const store = tx.objectStore('productos');
             store.clear();
             productos.forEach(p => store.put(p));
-            tx.oncomplete = resolve;
+            tx.oncomplete = () => {
+                console.log('✅ Productos guardados offline:', productos.length);
+                resolve();
+            };
             tx.onerror = () => reject(tx.error);
         });
     }
@@ -84,7 +101,10 @@ class OfflineDB {
             const tx = db.transaction('productos', 'readonly');
             const store = tx.objectStore('productos');
             const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                console.log('📖 Productos cargados offline:', request.result.length);
+                resolve(request.result);
+            };
             request.onerror = () => reject(request.error);
         });
     }
@@ -97,7 +117,10 @@ class OfflineDB {
             venta.fecha = new Date().toISOString();
             venta.sincronizada = false;
             store.put(venta);
-            tx.oncomplete = resolve;
+            tx.oncomplete = () => {
+                console.log('📝 Venta guardada offline:', venta.id);
+                resolve();
+            };
             tx.onerror = () => reject(tx.error);
         });
     }
@@ -145,6 +168,25 @@ class OfflineDB {
             request.onerror = () => reject(request.error);
         });
     }
+    
+    // Nueva función: limpiar toda la base de datos local
+    static async limpiarTodo() {
+        const db = await this.abrirDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['categorias', 'productos', 'ventas_pendientes', 'ventas_completadas'], 'readwrite');
+            
+            tx.objectStore('categorias').clear();
+            tx.objectStore('productos').clear();
+            tx.objectStore('ventas_pendientes').clear();
+            tx.objectStore('ventas_completadas').clear();
+            
+            tx.oncomplete = () => {
+                console.log('🧹 Base de datos local limpiada');
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    }
 }
 
 // ========== APP VENDEDORA ==========
@@ -163,6 +205,10 @@ const App = {
     async init() {
         console.log('🚀 Iniciando App Vendedora');
         this.setupConnectionListener();
+        
+        // Limpiar cache local al iniciar (opcional, comentar si no se desea)
+        // await OfflineDB.limpiarTodo();
+        
         await this.cargarCategoriasOffline();
         await this.cargarProductosOffline();
         await this.cargarVentasPendientesLocales();
@@ -244,9 +290,13 @@ const App = {
         this.mostrarNotificacion('🔄 Sincronizando datos...');
         
         try {
+            // Primero cargar categorías
             await this.cargarCategoriasDelServidor();
+            // Luego productos (que dependen de categorías)
             await this.cargarProductosDelServidor();
+            // Finalmente ventas pendientes
             await this.sincronizarVentasPendientes();
+            
             this.mostrarNotificacion('✅ Sincronización completa');
         } catch (error) {
             console.error('Error en sincronización:', error);
@@ -269,17 +319,18 @@ const App = {
             }
             
             const categorias = await response.json();
-            console.log('🏷️ Categorías recibidas:', categorias);
+            console.log('🏷️ Categorías recibidas del servidor:', categorias);
             
+            // Guardar en offline
             if (categorias && categorias.length > 0) {
                 await OfflineDB.guardarCategorias(categorias);
-                
-                if (this.usuario) {
-                    await this.cargarCategoriasOffline();
-                }
             } else {
-                console.log('⚠️ No se recibieron categorías del servidor');
+                // Si no hay categorías, guardar array vacío
+                await OfflineDB.guardarCategorias([]);
             }
+            
+            // Actualizar memoria local
+            await this.cargarCategoriasOffline();
             
             return categorias;
         } catch (error) {
@@ -291,32 +342,64 @@ const App = {
     async cargarCategoriasOffline() {
         try {
             this.categorias = await OfflineDB.cargarCategorias();
-            console.log(`🏷️ ${this.categorias.length} categorías cargadas offline`);
+            console.log(`🏷️ ${this.categorias.length} categorías cargadas offline:`, 
+                this.categorias.map(c => c.nombre));
             
-            if (this.categorias.length === 0) {
-                console.log('⚠️ No hay categorías guardadas offline');
-            }
+            // Actualizar filtros de categorías si es necesario
+            this.actualizarFiltrosCategorias();
         } catch (error) {
             console.error('❌ Error cargando categorías offline:', error);
             this.categorias = [];
         }
     },
     
+    actualizarFiltrosCategorias() {
+        // Actualizar los botones de filtro con las categorías reales
+        const filterContainer = document.getElementById('categoryFilterContainer');
+        if (!filterContainer) return;
+        
+        let html = '<button class="category-btn active" data-category="todos">Todos</button>';
+        
+        this.categorias.forEach(c => {
+            if (c.activa !== false) {
+                html += `<button class="category-btn" data-category="${c.id}">${c.nombre}</button>`;
+            }
+        });
+        
+        filterContainer.innerHTML = html;
+        
+        // Reasignar eventos
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.categoriaActiva = btn.dataset.category;
+                this.filtrarProductos(document.getElementById('searchInput')?.value.toLowerCase() || '', this.categoriaActiva);
+            });
+        });
+    },
+    
     obtenerNombreCategoria(categoriaId) {
-        if (!categoriaId) return 'General';
+        if (!categoriaId) return 'Sin categoría';
         const cat = this.categorias.find(c => c.id === categoriaId);
-        return cat ? cat.nombre : 'General';
+        return cat ? cat.nombre : 'Sin categoría';
     },
     
     // ===== PRODUCTOS =====
     async cargarProductosDelServidor() {
         try {
+            console.log('📥 Solicitando productos al servidor...');
             const response = await fetch(`${API_URL}/api/productos`);
-            if (!response.ok) throw new Error('Error al cargar productos');
+            
+            if (!response.ok) {
+                console.error('❌ Error en respuesta del servidor:', response.status);
+                return [];
+            }
             
             const productos = await response.json();
-            console.log('📦 Productos recibidos:', productos.length);
+            console.log('📦 Productos recibidos del servidor:', productos.length);
             
+            // Obtener ventas pendientes para ajustar stock
             const pendientes = await OfflineDB.obtenerVentasPendientes();
             
             if (pendientes.length > 0) {
@@ -344,7 +427,7 @@ const App = {
             
             return productos;
         } catch (error) {
-            console.error('Error cargando productos del servidor:', error);
+            console.error('❌ Error cargando productos del servidor:', error);
             return [];
         }
     },
@@ -360,7 +443,7 @@ const App = {
                 this.actualizarDashboard();
             }
         } catch (error) {
-            console.error('Error cargando productos offline:', error);
+            console.error('❌ Error cargando productos offline:', error);
             this.productos = [];
         }
     },
@@ -372,7 +455,7 @@ const App = {
             console.log(`⏳ ${this.ventasPendientes.length} ventas pendientes cargadas`);
             this.actualizarVistasPendientes();
         } catch (error) {
-            console.error('Error cargando ventas pendientes:', error);
+            console.error('❌ Error cargando ventas pendientes:', error);
             this.ventasPendientes = [];
         }
     },
@@ -409,6 +492,7 @@ const App = {
             cursor: pointer;
             transition: all 0.3s ease;
             animation: slideDown 0.3s ease;
+            z-index: 100;
         `;
         
         const icono = document.createElement('span');
@@ -597,12 +681,14 @@ const App = {
                 
                 this.actualizarInfoUsuario();
                 this.showVentaPanel();
+                
+                // Forzar carga de datos frescos del servidor
                 await this.cargarCategoriasDelServidor();
                 await this.cargarProductosDelServidor();
                 await this.cargarVentasPendientesLocales();
                 this.cargarVentasLocales();
-                this.showError('', 'clear');
                 
+                this.showError('', 'clear');
                 this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
             } else {
                 this.showError(data.error || 'Credenciales incorrectas');
@@ -676,14 +762,7 @@ const App = {
         searchInput?.addEventListener('input', performSearch);
         searchBtn?.addEventListener('click', performSearch);
         
-        document.querySelectorAll('.category-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.categoriaActiva = btn.dataset.category;
-                this.filtrarProductos(document.getElementById('searchInput')?.value.toLowerCase() || '', this.categoriaActiva);
-            });
-        });
+        // Los filtros se configuran en actualizarFiltrosCategorias
     },
     
     filtrarProductos(termino, categoria = 'todos') {
@@ -1005,21 +1084,28 @@ const App = {
         this.mostrarNotificacion(`🔄 Sincronizando ${pendientes.length} ventas...`);
         
         let sincronizadas = 0;
+        let fallidas = 0;
         
         for (const venta of pendientes) {
             try {
+                // Actualizar cada producto en el servidor
                 for (const item of venta.productos) {
-                    const productoLocal = this.productos.find(p => p.id === item.id);
+                    // Obtener producto actual del servidor
+                    const prodResponse = await fetch(`${API_URL}/api/dueno/productos`);
+                    const productosServidor = await prodResponse.json();
+                    const productoServidor = productosServidor.find(p => p.id === item.id);
                     
-                    if (productoLocal) {
+                    if (productoServidor) {
+                        const nuevoStock = productoServidor.stock - item.cantidad;
+                        
                         const response = await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                nombre: productoLocal.nombre,
-                                precio: productoLocal.precio,
-                                stock: productoLocal.stock,
-                                categoria: productoLocal.categoria
+                                nombre: productoServidor.nombre,
+                                precio: productoServidor.precio,
+                                stock: nuevoStock,
+                                categoria: productoServidor.categoria
                             })
                         });
                         
@@ -1037,9 +1123,11 @@ const App = {
                 
             } catch (error) {
                 console.error('Error sincronizando venta:', venta.id, error);
+                fallidas++;
             }
         }
         
+        // Recargar datos frescos del servidor
         await this.cargarCategoriasDelServidor();
         await this.cargarProductosDelServidor();
         await this.cargarVentasPendientesLocales();
@@ -1048,7 +1136,7 @@ const App = {
         this.actualizarEstadoConexion();
         
         if (sincronizadas > 0) {
-            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente`);
+            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas correctamente${fallidas > 0 ? ` (${fallidas} fallidas)` : ''}`);
             await this.cargarVentasLocales();
             this.renderizarProductos();
             this.cargarInventario();
