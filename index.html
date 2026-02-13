@@ -234,6 +234,73 @@
 .card[onclick]:hover {
     transform: scale(1.02);
         }
+
+        /* ===== ESTILOS PARA VENTAS PENDIENTES ===== */
+.status-warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.history-item[style*="border-left"] {
+    background-color: #fff3e0;
+}
+
+#pendientesBanner {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mejorar la card de pendientes */
+.card[onclick] {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.card[onclick]:hover {
+    transform: scale(1.02);
+}
+
+/* Botón de sincronización */
+#forzarSyncBtn {
+    transition: all 0.3s ease;
+}
+
+#forzarSyncBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(52, 152, 219, 0.5);
+}
+
+/* Productos con stock bajo */
+.low-stock {
+    border-left: 4px solid #f39c12;
+}
+
+.out-of-stock {
+    border-left: 4px solid #e74c3c;
+    opacity: 0.7;
+}
+
+/* Deshabilitar botones cuando no hay stock */
+.add-to-sale-btn:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.quantity-input:disabled {
+    background-color: #ecf0f1;
+    cursor: not-allowed;
+}         
     </style>
 </head>
 <body>
