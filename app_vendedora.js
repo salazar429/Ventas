@@ -1,16 +1,14 @@
 // ===========================================
 // APP VENDEDORA - VERSIÓN FINAL
-// CON VENTAS POR USUARIO + CIERRE DE SESIÓN AUTOMÁTICO
+// CON MENÚ DE USUARIO + CARRITO CORREGIDO
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
 const DB_NAME = 'FacturacionDB';
-const DB_VERSION = 4; // Incrementar versión para limpiar cache
+const DB_VERSION = 4;
 
-// Tiempo de inactividad: 30 minutos (1800000 ms)
 const TIEMPO_INACTIVIDAD = 30 * 60 * 1000;
 
-// ========== INDEXEDDB CON SEPARACIÓN POR USUARIO ==========
 class OfflineDB {
     static async abrirDB() {
         return new Promise((resolve, reject) => {
@@ -22,7 +20,6 @@ class OfflineDB {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 
-                // Eliminar stores antiguos
                 const stores = ['categorias', 'productos', 'ventas_pendientes', 'ventas_completadas', 'sesion'];
                 stores.forEach(store => {
                     if (db.objectStoreNames.contains(store)) {
@@ -30,28 +27,21 @@ class OfflineDB {
                     }
                 });
                 
-                // Crear nuevos stores
                 db.createObjectStore('categorias', { keyPath: 'id' });
                 
                 const storeProductos = db.createObjectStore('productos', { keyPath: 'id' });
                 storeProductos.createIndex('nombre', 'nombre', { unique: false });
                 storeProductos.createIndex('categoria', 'categoria', { unique: false });
                 
-                // Store para ventas pendientes con índice por vendedora
                 const storePendientes = db.createObjectStore('ventas_pendientes', { keyPath: 'id' });
                 storePendientes.createIndex('fecha', 'fecha', { unique: false });
                 storePendientes.createIndex('vendedoraId', 'vendedoraId', { unique: false });
-                storePendientes.createIndex('sincronizada', 'sincronizada', { unique: false });
                 
-                // Store para ventas completadas con índice por vendedora
                 const storeCompletadas = db.createObjectStore('ventas_completadas', { keyPath: 'id' });
                 storeCompletadas.createIndex('fecha', 'fecha', { unique: false });
                 storeCompletadas.createIndex('vendedoraId', 'vendedoraId', { unique: false });
                 
-                // Store para sesión
                 db.createObjectStore('sesion', { keyPath: 'id' });
-                
-                console.log('🔄 Base de datos actualizada a versión', DB_VERSION);
             };
         });
     }
@@ -102,21 +92,17 @@ class OfflineDB {
         });
     }
     
-    // Guardar venta pendiente con ID de vendedora
     static async guardarVentaPendiente(venta) {
         const db = await this.abrirDB();
         return new Promise((resolve, reject) => {
             const tx = db.transaction('ventas_pendientes', 'readwrite');
             const store = tx.objectStore('ventas_pendientes');
-            venta.fecha = new Date().toISOString();
-            venta.sincronizada = false;
             store.put(venta);
             tx.oncomplete = resolve;
             tx.onerror = () => reject(tx.error);
         });
     }
     
-    // Obtener ventas pendientes SOLO de la vendedora actual
     static async obtenerVentasPendientes(vendedoraId) {
         const db = await this.abrirDB();
         return new Promise((resolve, reject) => {
@@ -140,7 +126,6 @@ class OfflineDB {
         });
     }
     
-    // Guardar venta completada con ID de vendedora
     static async guardarVentaCompletada(venta) {
         const db = await this.abrirDB();
         return new Promise((resolve, reject) => {
@@ -152,7 +137,6 @@ class OfflineDB {
         });
     }
     
-    // Obtener ventas completadas SOLO de la vendedora actual
     static async cargarVentasCompletadas(vendedoraId) {
         const db = await this.abrirDB();
         return new Promise((resolve, reject) => {
@@ -165,7 +149,6 @@ class OfflineDB {
         });
     }
     
-    // Guardar timestamp de última actividad
     static async guardarUltimaActividad() {
         const db = await this.abrirDB();
         return new Promise((resolve, reject) => {
@@ -177,7 +160,6 @@ class OfflineDB {
         });
     }
     
-    // Obtener timestamp de última actividad
     static async obtenerUltimaActividad() {
         const db = await this.abrirDB();
         return new Promise((resolve, reject) => {
@@ -190,7 +172,6 @@ class OfflineDB {
     }
 }
 
-// ========== APP VENDEDORA ==========
 const App = {
     usuario: null,
     currentPage: 'dashboard',
@@ -207,14 +188,12 @@ const App = {
     async init() {
         console.log('🚀 Iniciando App Vendedora');
         
-        // Configurar detector de inactividad
         this.setupInactividad();
-        
         this.setupConnectionListener();
+        this.setupUserMenu();
         await this.cargarCategoriasOffline();
         await this.cargarProductosOffline();
         
-        // Verificar sesión activa
         await this.verificarSesion();
         
         this.hideSplashScreen();
@@ -228,22 +207,88 @@ const App = {
         this.setupPendientesClick();
     },
     
+    // ===== MENÚ DE USUARIO =====
+    setupUserMenu() {
+        const avatar = document.getElementById('userAvatar');
+        if (!avatar) return;
+        
+        // Crear menú desplegable
+        const menu = document.createElement('div');
+        menu.id = 'userMenu';
+        menu.style.cssText = `
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: 200px;
+            display: none;
+            z-index: 1000;
+            overflow: hidden;
+        `;
+        
+        menu.innerHTML = `
+            <div style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #eee;">
+                <strong id="menuUserName">${this.usuario?.nombre || 'Vendedora'}</strong><br>
+                <small style="color: #666;" id="menuUserTienda">${this.usuario?.tienda || ''}</small>
+            </div>
+            <div style="padding: 8px 0;">
+                <div class="menu-item" onclick="alert('Configuración - Falta implementación')" style="padding: 10px 16px; cursor: pointer; hover:background:#f5f5f5;">
+                    ⚙️ Ajustes
+                </div>
+                <div class="menu-item" onclick="alert('Tutoriales - Falta implementación')" style="padding: 10px 16px; cursor: pointer; hover:background:#f5f5f5;">
+                    📚 Tutoriales
+                </div>
+                <div class="menu-item" onclick="App.logout()" style="padding: 10px 16px; cursor: pointer; color: #e74c3c; hover:background:#f5f5f5;">
+                    🚪 Cerrar sesión
+                </div>
+            </div>
+        `;
+        
+        // Agregar estilos hover
+        const style = document.createElement('style');
+        style.textContent = `
+            .menu-item:hover {
+                background-color: #f5f5f5;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(menu);
+        
+        // Toggle menú al hacer clic en avatar
+        avatar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = menu.style.display === 'block';
+            menu.style.display = isVisible ? 'none' : 'block';
+            
+            // Actualizar nombre en el menú
+            document.getElementById('menuUserName').textContent = this.usuario?.nombre || 'Vendedora';
+            document.getElementById('menuUserTienda').textContent = this.usuario?.tienda || '';
+        });
+        
+        // Cerrar menú al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && e.target !== avatar) {
+                menu.style.display = 'none';
+            }
+        });
+    },
+    
     // ===== CONTROL DE SESIÓN =====
     setupInactividad() {
-        // Registrar actividad en cada interacción
         const eventos = ['click', 'mousemove', 'keypress', 'scroll', 'touchstart'];
         eventos.forEach(evento => {
             document.addEventListener(evento, () => this.registrarActividad());
         });
         
-        // Verificar inactividad cada minuto
         setInterval(() => this.verificarInactividad(), 60000);
     },
     
     async registrarActividad() {
         await OfflineDB.guardarUltimaActividad();
         
-        // Reiniciar timeout
         if (this.timeoutInactividad) {
             clearTimeout(this.timeoutInactividad);
         }
@@ -268,7 +313,6 @@ const App = {
     },
     
     async verificarSesion() {
-        // Al recargar la página, verificar si la sesión sigue activa
         const savedUser = localStorage.getItem('vendedora_activa');
         if (savedUser) {
             const ultimaActividad = await OfflineDB.obtenerUltimaActividad();
@@ -288,6 +332,7 @@ const App = {
         this.ventas = [];
         this.ventasPendientes = [];
         this.showLoginPanel();
+        document.getElementById('userMenu').style.display = 'none';
     },
     
     // ===== ESTADO DE CONEXIÓN =====
@@ -358,8 +403,10 @@ const App = {
             await this.cargarCategoriasDelServidor();
             await this.cargarProductosDelServidor();
             await this.sincronizarVentasPendientes();
+            this.mostrarNotificacion('✅ Sincronización completa');
         } catch (error) {
             console.error('Error en sincronización:', error);
+            this.mostrarNotificacion('❌ Error en sincronización');
         } finally {
             this.sincronizando = false;
             this.actualizarEstadoConexion();
@@ -503,9 +550,14 @@ const App = {
     // ===== CARRITO Y VENTAS =====
     agregarAlCarrito(productoId) {
         const producto = this.productos.find(p => p.id === productoId);
-        const cantidad = parseInt(document.getElementById(`cantidad-${productoId}`)?.value || '1');
+        const cantidadInput = document.getElementById(`cantidad-${productoId}`);
+        const cantidad = parseInt(cantidadInput?.value || '1');
         
-        if (!producto) return;
+        if (!producto) {
+            this.mostrarNotificacion('❌ Producto no encontrado');
+            return;
+        }
+        
         if (cantidad > producto.stock) {
             this.mostrarNotificacion('❌ Stock insuficiente');
             return;
@@ -600,7 +652,6 @@ const App = {
         if (totalSpan) totalSpan.textContent = `$${subtotal.toFixed(2)}`;
     },
     
-    // ===== VENTAS =====
     async completarVenta() {
         if (this.carrito.length === 0) {
             this.mostrarNotificacion('❌ No hay productos');
@@ -706,6 +757,8 @@ const App = {
         this.sincronizando = true;
         this.actualizarEstadoConexion();
         
+        let sincronizadas = 0;
+        
         for (const venta of pendientes) {
             try {
                 for (const item of venta.productos) {
@@ -731,6 +784,7 @@ const App = {
                 await OfflineDB.guardarVentaCompletada(venta);
                 await OfflineDB.eliminarVentaPendiente(venta.id);
                 this.ventas.push(venta);
+                sincronizadas++;
             } catch (error) {
                 console.error('Error sincronizando venta:', error);
             }
@@ -742,12 +796,14 @@ const App = {
         
         this.sincronizando = false;
         this.actualizarEstadoConexion();
-        this.mostrarNotificacion(`✅ Ventas sincronizadas`);
-        await this.cargarVentasLocales();
-        this.renderizarProductos();
+        
+        if (sincronizadas > 0) {
+            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas`);
+            await this.cargarVentasLocales();
+            this.renderizarProductos();
+        }
     },
     
-    // ===== VENTAS LOCALES POR USUARIO =====
     async cargarVentasLocales() {
         if (!this.usuario) return;
         
@@ -771,154 +827,6 @@ const App = {
         }
     },
     
-    // ===== LOGIN =====
-    checkLogin() {
-        const savedUser = localStorage.getItem('vendedora_activa');
-        if (savedUser) {
-            try {
-                this.usuario = JSON.parse(savedUser);
-                this.showVentaPanel();
-                this.cargarProductosOffline();
-                this.cargarCategoriasOffline();
-                this.actualizarInfoUsuario();
-                this.cargarVentasLocales();
-                this.cargarVentasPendientesLocales();
-                this.registrarActividad();
-            } catch (e) {
-                this.showLoginPanel();
-            }
-        } else {
-            this.showLoginPanel();
-        }
-    },
-    
-    async login() {
-        const usuario = document.getElementById('usuario').value.trim();
-        const password = document.getElementById('password').value;
-        
-        if (!usuario || !password) {
-            this.showError('Usuario y contraseña obligatorios');
-            return;
-        }
-        
-        if (!this.online) {
-            this.showError('Necesitas conexión a internet');
-            return;
-        }
-        
-        const btn = document.getElementById('btnLogin');
-        btn.disabled = true;
-        btn.textContent = '🔐 Verificando...';
-        
-        try {
-            const response = await fetch(`${API_URL}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usuario, password })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                this.usuario = data.usuario;
-                localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
-                
-                await this.registrarActividad();
-                this.actualizarInfoUsuario();
-                this.showVentaPanel();
-                await this.cargarCategoriasDelServidor();
-                await this.cargarProductosDelServidor();
-                await this.cargarVentasPendientesLocales();
-                await this.cargarVentasLocales();
-                this.showError('', 'clear');
-                this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
-            } else {
-                this.showError(data.error || 'Credenciales incorrectas');
-            }
-        } catch (error) {
-            this.showError('Error de conexión');
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '🔑 Iniciar Sesión';
-        }
-    },
-    
-    logout() {
-        this.cerrarSesion();
-    },
-    
-    // ===== NAVEGACIÓN =====
-    setupNavigation() {
-        document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.switchPage(item.dataset.page);
-            });
-        });
-        
-        document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
-        document.getElementById('userAvatar')?.addEventListener('click', () => this.logout());
-    },
-    
-    switchPage(page) {
-        document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
-            item.classList.remove('active');
-            if (item.dataset.page === page) item.classList.add('active');
-        });
-        
-        document.querySelectorAll('#ventaPanel .page-section').forEach(section => {
-            section.classList.remove('active');
-        });
-        
-        document.getElementById(`${page}Section`).classList.add('active');
-        this.currentPage = page;
-        
-        if (page === 'products') this.cargarInventario();
-        else if (page === 'sales') this.cargarTodasLasVentas();
-    },
-    
-    // ===== BÚSQUEDA =====
-    setupSearchAndFilters() {
-        const searchInput = document.getElementById('searchInput');
-        const searchBtn = document.getElementById('searchBtn');
-        
-        const performSearch = () => {
-            this.filtrarProductos(searchInput.value.toLowerCase(), this.categoriaActiva);
-        };
-        
-        searchInput?.addEventListener('input', performSearch);
-        searchBtn?.addEventListener('click', performSearch);
-    },
-    
-    filtrarProductos(termino, categoria = 'todos') {
-        document.querySelectorAll('#productoContainer .product-card').forEach(card => {
-            const nombre = card.querySelector('.product-name')?.textContent.toLowerCase() || '';
-            const categoriaProd = card.dataset.categoria || 'general';
-            
-            let mostrar = true;
-            if (termino && !nombre.includes(termino)) mostrar = false;
-            if (categoria !== 'todos' && categoriaProd !== categoria) mostrar = false;
-            
-            card.style.display = mostrar ? 'block' : 'none';
-        });
-    },
-    
-    // ===== BOTÓN FLOTANTE =====
-    setupFloatingButton() {
-        const floatingBtn = document.getElementById('floatingSaleBtn');
-        const closeBtn = document.getElementById('closeSaleBtn');
-        const panel = document.getElementById('currentSalePanel');
-        const ventaActualCard = document.getElementById('ventaActualCard');
-        
-        floatingBtn?.addEventListener('click', () => panel?.classList.toggle('active'));
-        closeBtn?.addEventListener('click', () => panel?.classList.remove('active'));
-        ventaActualCard?.addEventListener('click', () => panel?.classList.toggle('active'));
-        
-        document.getElementById('clearSaleBtn')?.addEventListener('click', () => this.limpiarCarrito());
-        document.getElementById('completeSaleBtn')?.addEventListener('click', () => this.completarVenta());
-    },
-    
-    // ===== VENTAS PENDIENTES =====
     actualizarVistasPendientes() {
         const pendienteCount = document.getElementById('pendienteCount');
         if (pendienteCount) pendienteCount.textContent = this.ventasPendientes.length;
@@ -1003,6 +911,154 @@ const App = {
                 document.getElementById('loginPanel')?.classList.add('visible');
             }, 500);
         }, 2000);
+    },
+    
+    // ===== LOGIN =====
+    checkLogin() {
+        const savedUser = localStorage.getItem('vendedora_activa');
+        if (savedUser) {
+            try {
+                this.usuario = JSON.parse(savedUser);
+                this.showVentaPanel();
+                this.cargarProductosOffline();
+                this.cargarCategoriasOffline();
+                this.actualizarInfoUsuario();
+                this.cargarVentasLocales();
+                this.cargarVentasPendientesLocales();
+                this.registrarActividad();
+                this.setupUserMenu();
+            } catch (e) {
+                this.showLoginPanel();
+            }
+        } else {
+            this.showLoginPanel();
+        }
+    },
+    
+    async login() {
+        const usuario = document.getElementById('usuario').value.trim();
+        const password = document.getElementById('password').value;
+        
+        if (!usuario || !password) {
+            this.showError('Usuario y contraseña obligatorios');
+            return;
+        }
+        
+        if (!this.online) {
+            this.showError('Necesitas conexión a internet');
+            return;
+        }
+        
+        const btn = document.getElementById('btnLogin');
+        btn.disabled = true;
+        btn.textContent = '🔐 Verificando...';
+        
+        try {
+            const response = await fetch(`${API_URL}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuario, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                this.usuario = data.usuario;
+                localStorage.setItem('vendedora_activa', JSON.stringify(this.usuario));
+                
+                await this.registrarActividad();
+                this.actualizarInfoUsuario();
+                this.setupUserMenu();
+                this.showVentaPanel();
+                await this.cargarCategoriasDelServidor();
+                await this.cargarProductosDelServidor();
+                await this.cargarVentasPendientesLocales();
+                await this.cargarVentasLocales();
+                this.showError('', 'clear');
+                this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
+            } else {
+                this.showError(data.error || 'Credenciales incorrectas');
+            }
+        } catch (error) {
+            this.showError('Error de conexión');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔑 Iniciar Sesión';
+        }
+    },
+    
+    logout() {
+        this.cerrarSesion();
+    },
+    
+    // ===== NAVEGACIÓN =====
+    setupNavigation() {
+        document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchPage(item.dataset.page);
+            });
+        });
+        
+        document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
+    },
+    
+    switchPage(page) {
+        document.querySelectorAll('#ventaPanel .nav-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.page === page) item.classList.add('active');
+        });
+        
+        document.querySelectorAll('#ventaPanel .page-section').forEach(section => {
+            section.classList.remove('active');
+        });
+        
+        document.getElementById(`${page}Section`).classList.add('active');
+        this.currentPage = page;
+        
+        if (page === 'products') this.cargarInventario();
+        else if (page === 'sales') this.cargarTodasLasVentas();
+    },
+    
+    // ===== BÚSQUEDA =====
+    setupSearchAndFilters() {
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        
+        const performSearch = () => {
+            this.filtrarProductos(searchInput.value.toLowerCase(), this.categoriaActiva);
+        };
+        
+        searchInput?.addEventListener('input', performSearch);
+        searchBtn?.addEventListener('click', performSearch);
+    },
+    
+    filtrarProductos(termino, categoria = 'todos') {
+        document.querySelectorAll('#productoContainer .product-card').forEach(card => {
+            const nombre = card.querySelector('.product-name')?.textContent.toLowerCase() || '';
+            const categoriaProd = card.dataset.categoria || 'general';
+            
+            let mostrar = true;
+            if (termino && !nombre.includes(termino)) mostrar = false;
+            if (categoria !== 'todos' && categoriaProd !== categoria) mostrar = false;
+            
+            card.style.display = mostrar ? 'block' : 'none';
+        });
+    },
+    
+    // ===== BOTÓN FLOTANTE =====
+    setupFloatingButton() {
+        const floatingBtn = document.getElementById('floatingSaleBtn');
+        const closeBtn = document.getElementById('closeSaleBtn');
+        const panel = document.getElementById('currentSalePanel');
+        const ventaActualCard = document.getElementById('ventaActualCard');
+        
+        floatingBtn?.addEventListener('click', () => panel?.classList.toggle('active'));
+        closeBtn?.addEventListener('click', () => panel?.classList.remove('active'));
+        ventaActualCard?.addEventListener('click', () => panel?.classList.toggle('active'));
+        
+        document.getElementById('clearSaleBtn')?.addEventListener('click', () => this.limpiarCarrito());
+        document.getElementById('completeSaleBtn')?.addEventListener('click', () => this.completarVenta());
     },
     
     // ===== VENTAS RECIENTES =====
