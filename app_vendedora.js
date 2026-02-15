@@ -1,11 +1,9 @@
 // ===========================================
-// APP VENDEDORA - VERSIÓN SIMPLIFICADA
-// CON LA MISMA LÓGICA QUE FUNCIONABA ANTES
+// APP VENDEDORA - VERSIÓN FUNCIONAL + REPORTES BÁSICOS
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
 
-// ========== APP VENDEDORA SIMPLIFICADA ==========
 const App = {
     usuario: null,
     currentPage: 'dashboard',
@@ -19,7 +17,7 @@ const App = {
     sincronizando: false,
     
     async init() {
-        console.log('🚀 Iniciando App Vendedora (versión simplificada)');
+        console.log('🚀 Iniciando App Vendedora');
         
         this.setupConnectionListener();
         await this.cargarCategoriasLocales();
@@ -32,6 +30,65 @@ const App = {
         this.setupNavigation();
         this.setupFloatingButton();
         this.setupSearchAndFilters();
+        this.setupReportesBasicos(); // ⚠️ SOLO REPORTES BÁSICOS
+    },
+    
+    // ===== REPORTES BÁSICOS (SIN ROMPER NADA) =====
+    setupReportesBasicos() {
+        const pdfBtn = document.getElementById('exportPDFBtn');
+        if (pdfBtn) {
+            pdfBtn.addEventListener('click', () => this.generarReportePDF());
+        }
+        
+        const excelBtn = document.getElementById('exportExcelBtn');
+        if (excelBtn) {
+            excelBtn.addEventListener('click', () => this.generarReporteExcel());
+        }
+    },
+    
+    generarReportePDF() {
+        const fecha = new Date().toLocaleDateString();
+        const ventasHoy = this.ventas.filter(v => 
+            new Date(v.fecha).toLocaleDateString() === fecha
+        );
+        
+        let texto = `📊 REPORTE DE VENTAS - ${fecha}\n`;
+        texto += `Vendedora: ${this.usuario?.nombre || 'N/A'}\n`;
+        texto += `\n📦 Ventas hoy: ${ventasHoy.length}\n`;
+        texto += `💰 Total: $${ventasHoy.reduce((s, v) => s + v.total, 0).toFixed(2)}\n`;
+        
+        const blob = new Blob([texto], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte_${fecha.replace(/\//g, '-')}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.mostrarNotificacion('📄 Reporte generado');
+    },
+    
+    generarReporteExcel() {
+        const fecha = new Date().toLocaleDateString();
+        let csv = '"Fecha","Cliente","Total","Estado"\n';
+        
+        this.ventas.forEach(v => {
+            const fechaVenta = new Date(v.fecha).toLocaleString();
+            csv += `"${fechaVenta}","${v.cliente}","${v.total.toFixed(2)}","Completada"\n`;
+        });
+        
+        this.ventasPendientes.forEach(v => {
+            const fechaVenta = new Date(v.fecha).toLocaleString();
+            csv += `"${fechaVenta}","${v.cliente}","${v.total.toFixed(2)}","Pendiente"\n`;
+        });
+        
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte_${fecha.replace(/\//g, '-')}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.mostrarNotificacion('📊 Reporte Excel generado');
     },
     
     // ===== ESTADO DE CONEXIÓN =====
@@ -40,7 +97,6 @@ const App = {
             this.online = true;
             this.actualizarEstadoConexion();
             this.mostrarNotificacion('📶 Conexión restablecida');
-            this.sincronizarTodo();
         });
         
         window.addEventListener('offline', () => {
@@ -55,42 +111,19 @@ const App = {
         if (!dot) return;
         
         dot.className = 'connection-dot';
-        
-        if (this.sincronizando) {
-            dot.classList.add('syncing');
-        } else if (this.online) {
-            dot.classList.add('online');
-        } else {
-            dot.classList.add('offline');
-        }
+        if (this.online) dot.classList.add('online');
+        else dot.classList.add('offline');
     },
     
     async verificarConexion() {
         if (!this.online) return;
         
-        this.sincronizando = true;
-        this.actualizarEstadoConexion();
-        
         try {
             await fetch(API_URL);
-            await this.sincronizarTodo();
-        } catch (error) {
-            console.log('❌ Error de conexión');
-        } finally {
-            this.sincronizando = false;
-            this.actualizarEstadoConexion();
-        }
-    },
-    
-    async sincronizarTodo() {
-        if (!this.online || !this.usuario) return;
-        
-        try {
             await this.cargarCategoriasDelServidor();
             await this.cargarProductosDelServidor();
-            await this.sincronizarVentasPendientes();
         } catch (error) {
-            console.error('Error en sincronización:', error);
+            console.log('❌ Error de conexión');
         }
     },
     
@@ -101,10 +134,8 @@ const App = {
             this.categorias = await response.json();
             localStorage.setItem('categorias', JSON.stringify(this.categorias));
             this.actualizarFiltrosCategorias();
-            return this.categorias;
         } catch (error) {
             console.error('Error cargando categorías:', error);
-            return this.cargarCategoriasLocales();
         }
     },
     
@@ -114,7 +145,6 @@ const App = {
             this.categorias = JSON.parse(cats);
             this.actualizarFiltrosCategorias();
         }
-        return this.categorias;
     },
     
     actualizarFiltrosCategorias() {
@@ -145,26 +175,15 @@ const App = {
         return cat ? cat.nombre : 'Sin categoría';
     },
     
-    // ===== PRODUCTOS (VERSIÓN QUE FUNCIONABA) =====
+    // ===== PRODUCTOS =====
     async cargarProductosDelServidor() {
         try {
             const response = await fetch(`${API_URL}/api/productos`);
-            const productos = await response.json();
-            
-            // Guardar en localStorage
-            localStorage.setItem('productos', JSON.stringify(productos));
-            
-            this.productos = productos;
-            
-            if (this.usuario) {
-                this.renderizarProductos();
-                this.cargarInventario();
-            }
-            
-            return productos;
+            this.productos = await response.json();
+            localStorage.setItem('productos', JSON.stringify(this.productos));
+            if (this.usuario) this.renderizarProductos();
         } catch (error) {
-            console.error('Error cargando productos del servidor:', error);
-            return this.cargarProductosLocales();
+            console.error('Error cargando productos:', error);
         }
     },
     
@@ -172,12 +191,8 @@ const App = {
         const prods = localStorage.getItem('productos');
         if (prods) {
             this.productos = JSON.parse(prods);
-            if (this.usuario) {
-                this.renderizarProductos();
-                this.cargarInventario();
-            }
+            if (this.usuario) this.renderizarProductos();
         }
-        return this.productos;
     },
     
     renderizarProductos() {
@@ -185,7 +200,7 @@ const App = {
         if (!container) return;
         
         if (this.productos.length === 0) {
-            container.innerHTML = '<div class="empty-message">No hay productos disponibles</div>';
+            container.innerHTML = '<div class="empty-message">No hay productos</div>';
             return;
         }
         
@@ -199,7 +214,7 @@ const App = {
                 <div class="product-card" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
                     <div class="product-icon">📦</div>
                     <div class="product-name">${p.nombre}</div>
-                    <div style="font-size:0.7rem; color:#666;">🏷️ ${categoriaNombre}</div>
+                    <div style="font-size:0.7rem;">🏷️ ${categoriaNombre}</div>
                     <div class="product-price">$${p.precio.toFixed(2)}</div>
                     <div class="product-stock">Stock: ${p.stock} uds</div>
                     <div class="product-actions">
@@ -216,23 +231,15 @@ const App = {
         this.cargarInventario();
     },
     
-    // ===== CARRITO Y VENTAS (VERSIÓN QUE FUNCIONABA) =====
+    // ===== CARRITO Y VENTAS =====
     agregarAlCarrito(productoId) {
-        console.log('🔍 Buscando producto:', productoId);
-        console.log('📦 Productos disponibles:', this.productos.map(p => ({ id: p.id, nombre: p.nombre })));
-        
         const producto = this.productos.find(p => p.id === productoId);
-        
         if (!producto) {
-            console.error('❌ Producto no encontrado');
             this.mostrarNotificacion('❌ Producto no encontrado');
             return;
         }
         
-        console.log('✅ Producto encontrado:', producto.nombre);
-        
-        const cantidadInput = document.getElementById(`cantidad-${productoId}`);
-        const cantidad = parseInt(cantidadInput?.value || '1');
+        const cantidad = parseInt(document.getElementById(`cantidad-${productoId}`)?.value || '1');
         
         if (cantidad > producto.stock) {
             this.mostrarNotificacion('❌ Stock insuficiente');
@@ -267,7 +274,7 @@ const App = {
     
     limpiarCarrito() {
         if (this.carrito.length === 0) return;
-        if (confirm('¿Cancelar la venta actual?')) {
+        if (confirm('¿Cancelar la venta?')) {
             this.carrito = [];
             this.actualizarCarrito();
             document.getElementById('currentSalePanel')?.classList.remove('active');
@@ -355,7 +362,6 @@ const App = {
         };
         
         if (this.online) {
-            // Venta online - actualizar stock en servidor
             let exito = true;
             
             for (const item of this.carrito) {
@@ -385,7 +391,6 @@ const App = {
                 this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
             }
         } else {
-            // Venta offline
             this.ventasPendientes.push(venta);
             localStorage.setItem('ventas_pendientes', JSON.stringify(this.ventasPendientes));
             this.mostrarNotificacion(`⏳ Venta guardada offline`);
@@ -395,43 +400,6 @@ const App = {
         this.actualizarCarrito();
         document.getElementById('currentSalePanel')?.classList.remove('active');
         document.getElementById('clientName').value = '';
-    },
-    
-    async sincronizarVentasPendientes() {
-        if (!this.online || !this.usuario) return;
-        
-        const pendientes = this.ventasPendientes;
-        if (pendientes.length === 0) return;
-        
-        let sincronizadas = 0;
-        
-        for (const venta of pendientes) {
-            try {
-                for (const item of venta.productos) {
-                    await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            stock: 0 // Simplificado
-                        })
-                    });
-                }
-                
-                venta.estado = 'completada';
-                this.ventas.push(venta);
-                sincronizadas++;
-            } catch (error) {
-                console.error('Error sincronizando venta:', error);
-            }
-        }
-        
-        this.ventasPendientes = [];
-        localStorage.setItem('ventas', JSON.stringify(this.ventas));
-        localStorage.setItem('ventas_pendientes', '[]');
-        
-        if (sincronizadas > 0) {
-            this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas`);
-        }
     },
     
     // ===== SPLASH SCREEN =====
@@ -622,7 +590,7 @@ const App = {
         const container = document.getElementById('allSalesContainer');
         if (!container) return;
         
-        if (this.ventas.length === 0) {
+        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
             container.innerHTML = '<div class="empty-message">No hay ventas</div>';
             return;
         }
@@ -632,10 +600,28 @@ const App = {
             const fecha = new Date(v.fecha).toLocaleString();
             html += `
                 <div class="history-item">
-                    <div>${v.cliente}<br><small>${fecha}</small></div>
-                    <div>${v.productos.length} productos</div>
+                    <div>
+                        <div style="font-weight:600;">${v.cliente}</div>
+                        <div style="font-size:0.75rem;">${fecha}</div>
+                    </div>
+                    <div>${v.productos.reduce((s, i) => s + i.cantidad, 0)} productos</div>
                     <div>$${v.total.toFixed(2)}</div>
-                    <div>Completada</div>
+                    <div><span class="status status-completed">Completada</span></div>
+                </div>
+            `;
+        });
+        
+        this.ventasPendientes.forEach(v => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            html += `
+                <div class="history-item" style="border-left:4px solid #f39c12;">
+                    <div>
+                        <div style="font-weight:600;">${v.cliente}</div>
+                        <div style="font-size:0.75rem;">${fecha}</div>
+                    </div>
+                    <div>${v.productos.reduce((s, i) => s + i.cantidad, 0)} productos</div>
+                    <div>$${v.total.toFixed(2)}</div>
+                    <div><span class="status status-warning">Pendiente</span></div>
                 </div>
             `;
         });
