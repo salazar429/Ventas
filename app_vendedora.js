@@ -1,6 +1,6 @@
 // ===========================================
-// APP VENDEDORA - VERSIÓN CORREGIDA
-// CON CONTADORES Y VENTAS RECIENTES FUNCIONANDO
+// APP VENDEDORA - CORRECCIÓN FINAL
+// CONTADOR DE PRODUCTOS Y HORA EN REPORTES
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
@@ -53,6 +53,7 @@ const App = {
         });
         
         this.renderizarProductos();
+        this.actualizarContadorProductos(); // ✅ NUEVA FUNCIÓN ESPECÍFICA
         this.cargarInventario();
         this.cargarVentasRecientes();
         this.cargarTodasLasVentas();
@@ -60,7 +61,23 @@ const App = {
         this.actualizarVistasPendientes();
     },
     
-    // ===== DASHBOARD CORREGIDO =====
+    // ===== NUEVA FUNCIÓN PARA ACTUALIZAR SOLO EL CONTADOR DE PRODUCTOS =====
+    actualizarContadorProductos() {
+        const productCountSpan = document.getElementById('productCount');
+        if (productCountSpan) {
+            productCountSpan.textContent = `(${this.productos.length} productos)`;
+            console.log('✅ Contador de productos actualizado:', this.productos.length);
+        } else {
+            console.warn('⚠️ Elemento productCount no encontrado');
+        }
+        
+        const totalProductosSpan = document.getElementById('totalProductosCount');
+        if (totalProductosSpan) {
+            totalProductosSpan.textContent = this.productos.length;
+        }
+    },
+    
+    // ===== DASHBOARD =====
     actualizarDashboard() {
         console.log('📊 Actualizando dashboard');
         
@@ -78,8 +95,6 @@ const App = {
         if (ventasHoyEl) {
             ventasHoyEl.textContent = ventasHoy;
             console.log('✅ Ventas hoy actualizado:', ventasHoy);
-        } else {
-            console.warn('⚠️ Elemento ventasHoyCount no encontrado');
         }
         
         if (totalProductosEl) {
@@ -99,7 +114,111 @@ const App = {
         }
     },
     
-    // ===== VENTAS RECIENTES CORREGIDO =====
+    // ===== RENDERIZAR PRODUCTOS (ACTUALIZA EL CONTADOR) =====
+    renderizarProductos() {
+        const container = document.getElementById('productoContainer');
+        if (!container) return;
+        
+        if (this.productos.length === 0) {
+            container.innerHTML = '<div class="empty-message" style="text-align:center; padding:40px;">No hay productos disponibles</div>';
+            this.actualizarContadorProductos(); // Actualizar contador aunque esté vacío
+            return;
+        }
+        
+        let html = '';
+        this.productos.forEach(p => {
+            const disabled = p.stock === 0 ? 'disabled' : '';
+            const maxStock = p.stock;
+            const categoriaNombre = this.obtenerNombreCategoria(p.categoria);
+            
+            html += `
+                <div class="product-card ${p.stock < 5 ? 'low-stock' : ''}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
+                    <div class="product-icon">📦</div>
+                    <div class="product-name">${p.nombre}</div>
+                    <div style="font-size:0.7rem; color:#666;">🏷️ ${categoriaNombre}</div>
+                    <div class="product-price">$${p.precio.toFixed(2)}</div>
+                    <div class="product-stock">Stock: ${p.stock} uds</div>
+                    <div class="product-actions">
+                        <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${maxStock}" ${disabled}>
+                        <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')" ${disabled}>
+                            🛒 Agregar
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        this.actualizarContadorProductos(); // ✅ ACTUALIZAR CONTADOR DESPUÉS DE RENDERIZAR
+    },
+    
+    // ===== REPORTES CON HORA CORREGIDA =====
+    generarReporte(fecha) {
+        console.log('📊 Generando reporte para fecha:', fecha);
+        
+        const ventas = this.ventas.filter(v => v.fecha.split('T')[0] === fecha);
+        const pendientes = this.ventasPendientes.filter(v => v.fecha.split('T')[0] === fecha);
+        const total = ventas.reduce((s, v) => s + v.total, 0);
+        const totalPend = pendientes.reduce((s, v) => s + v.total, 0);
+        
+        const dailyTotal = document.getElementById('dailyTotal');
+        const dailyCount = document.getElementById('dailySalesCount');
+        const dailyAvg = document.getElementById('dailyAvg');
+        const categorySales = document.getElementById('categorySales');
+        const bestProduct = document.getElementById('bestProduct');
+        const bestHour = document.getElementById('bestHour');
+        const topCategory = document.getElementById('topCategory');
+        
+        if (dailyTotal) dailyTotal.textContent = `$${(total + totalPend).toFixed(2)}`;
+        if (dailyCount) dailyCount.textContent = ventas.length;
+        if (dailyAvg) dailyAvg.textContent = ventas.length ? `$${(total/ventas.length).toFixed(2)}` : '$0.00';
+        
+        if (categorySales) {
+            let cats = '';
+            this.categorias.forEach(c => {
+                const ventasCat = ventas.filter(v => v.productos.some(p => p.categoria === c.id))
+                                        .reduce((s, v) => s + v.total, 0);
+                cats += `<div class="category-sale-item"><span>${c.nombre}</span><span>$${ventasCat.toFixed(2)}</span></div>`;
+            });
+            
+            categorySales.innerHTML = `
+                <div style="color:#f39c12; margin-bottom:8px; font-weight:bold;">⏳ Pendientes: $${totalPend.toFixed(2)}</div>
+                ${cats}
+            `;
+        }
+        
+        if (bestProduct) bestProduct.textContent = this.productos[0]?.nombre || '-';
+        
+        // ✅ HORA CORREGIDA - Calcular la hora con más ventas
+        if (bestHour) {
+            // Analizar las horas de las ventas
+            const horas = {};
+            ventas.forEach(v => {
+                const hora = new Date(v.fecha).getHours();
+                const rango = `${hora}:00 - ${hora+1}:00`;
+                horas[rango] = (horas[rango] || 0) + 1;
+            });
+            
+            // Encontrar la hora con más ventas
+            let maxVentas = 0;
+            let horaTop = '15:00 - 16:00'; // Valor por defecto
+            for (const [rango, cantidad] of Object.entries(horas)) {
+                if (cantidad > maxVentas) {
+                    maxVentas = cantidad;
+                    horaTop = rango;
+                }
+            }
+            
+            bestHour.textContent = horaTop;
+            console.log('✅ Mejor hora calculada:', horaTop);
+        }
+        
+        if (topCategory) topCategory.textContent = this.categorias[0]?.nombre || '-';
+        
+        this.mostrarNotificacion('📊 Reporte generado');
+    },
+    
+    // ===== VENTAS RECIENTES =====
     cargarVentasRecientes() {
         console.log('📋 Cargando ventas recientes');
         const container = document.getElementById('ventasRecientesContainer');
@@ -149,7 +268,7 @@ const App = {
         console.log('✅ Ventas recientes actualizadas');
     },
     
-    // ===== INVENTARIO CORREGIDO =====
+    // ===== INVENTARIO =====
     cargarInventario() {
         console.log('📦 Cargando inventario');
         
@@ -419,6 +538,7 @@ const App = {
                 this.renderizarProductos();
                 this.cargarInventario();
                 this.actualizarDashboard();
+                this.actualizarContadorProductos(); // ✅ ACTUALIZAR CONTADOR
             }
             
             return productos;
@@ -436,44 +556,10 @@ const App = {
                 this.renderizarProductos();
                 this.cargarInventario();
                 this.actualizarDashboard();
+                this.actualizarContadorProductos(); // ✅ ACTUALIZAR CONTADOR
             }
         }
         return this.productos;
-    },
-    
-    renderizarProductos() {
-        const container = document.getElementById('productoContainer');
-        if (!container) return;
-        
-        if (this.productos.length === 0) {
-            container.innerHTML = '<div class="empty-message" style="text-align:center; padding:40px;">No hay productos disponibles</div>';
-            return;
-        }
-        
-        let html = '';
-        this.productos.forEach(p => {
-            const disabled = p.stock === 0 ? 'disabled' : '';
-            const maxStock = p.stock;
-            const categoriaNombre = this.obtenerNombreCategoria(p.categoria);
-            
-            html += `
-                <div class="product-card ${p.stock < 5 ? 'low-stock' : ''}" data-producto-id="${p.id}" data-categoria="${p.categoria || 'general'}">
-                    <div class="product-icon">📦</div>
-                    <div class="product-name">${p.nombre}</div>
-                    <div style="font-size:0.7rem; color:#666;">🏷️ ${categoriaNombre}</div>
-                    <div class="product-price">$${p.precio.toFixed(2)}</div>
-                    <div class="product-stock">Stock: ${p.stock} uds</div>
-                    <div class="product-actions">
-                        <input type="number" id="cantidad-${p.id}" class="quantity-input" value="1" min="1" max="${maxStock}" ${disabled}>
-                        <button class="add-to-sale-btn" onclick="App.agregarAlCarrito('${p.id}')" ${disabled}>
-                            🛒 Agregar
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-        
-        container.innerHTML = html;
     },
     
     // ===== CARRITO Y VENTAS =====
@@ -640,6 +726,7 @@ const App = {
                 this.cargarVentasRecientes();
                 this.cargarTodasLasVentas();
                 this.actualizarDashboard();
+                this.actualizarContadorProductos(); // ✅ ACTUALIZAR CONTADOR
                 this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
             }
         } else {
@@ -650,6 +737,7 @@ const App = {
             this.cargarVentasRecientes();
             this.cargarTodasLasVentas();
             this.actualizarDashboard();
+            this.actualizarContadorProductos(); // ✅ ACTUALIZAR CONTADOR
         }
         
         this.carrito = [];
@@ -703,6 +791,7 @@ const App = {
         this.cargarVentasRecientes();
         this.cargarTodasLasVentas();
         this.actualizarDashboard();
+        this.actualizarContadorProductos(); // ✅ ACTUALIZAR CONTADOR
         
         if (sincronizadas > 0) {
             this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas`);
@@ -828,47 +917,6 @@ const App = {
                 exportSection.appendChild(enviarBtn);
             }
         }, 1000);
-    },
-    
-    generarReporte(fecha) {
-        console.log('📊 Generando reporte para fecha:', fecha);
-        
-        const ventas = this.ventas.filter(v => v.fecha.split('T')[0] === fecha);
-        const pendientes = this.ventasPendientes.filter(v => v.fecha.split('T')[0] === fecha);
-        const total = ventas.reduce((s, v) => s + v.total, 0);
-        const totalPend = pendientes.reduce((s, v) => s + v.total, 0);
-        
-        const dailyTotal = document.getElementById('dailyTotal');
-        const dailyCount = document.getElementById('dailySalesCount');
-        const dailyAvg = document.getElementById('dailyAvg');
-        const categorySales = document.getElementById('categorySales');
-        const bestProduct = document.getElementById('bestProduct');
-        const bestHour = document.getElementById('bestHour');
-        const topCategory = document.getElementById('topCategory');
-        
-        if (dailyTotal) dailyTotal.textContent = `$${(total + totalPend).toFixed(2)}`;
-        if (dailyCount) dailyCount.textContent = ventas.length;
-        if (dailyAvg) dailyAvg.textContent = ventas.length ? `$${(total/ventas.length).toFixed(2)}` : '$0.00';
-        
-        if (categorySales) {
-            let cats = '';
-            this.categorias.forEach(c => {
-                const ventasCat = ventas.filter(v => v.productos.some(p => p.categoria === c.id))
-                                        .reduce((s, v) => s + v.total, 0);
-                cats += `<div class="category-sale-item"><span>${c.nombre}</span><span>$${ventasCat.toFixed(2)}</span></div>`;
-            });
-            
-            categorySales.innerHTML = `
-                <div style="color:#f39c12; margin-bottom:8px; font-weight:bold;">⏳ Pendientes: $${totalPend.toFixed(2)}</div>
-                ${cats}
-            `;
-        }
-        
-        if (bestProduct) bestProduct.textContent = this.productos[0]?.nombre || '-';
-        if (bestHour) bestHour.textContent = '15:00 - 17:00';
-        if (topCategory) topCategory.textContent = this.categorias[0]?.nombre || '-';
-        
-        this.mostrarNotificacion('📊 Reporte generado');
     },
     
     generarReportePDF() {
