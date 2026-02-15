@@ -1,6 +1,6 @@
 // ===========================================
-// APP VENDEDORA - VERSIÓN COMPLETA Y DEFINITIVA
-// CON REPORTES Y TODAS LAS FUNCIONALIDADES
+// APP VENDEDORA - VERSIÓN COMPLETAMENTE CORREGIDA
+// CON TODAS LAS FUNCIONALIDADES OPERATIVAS
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
@@ -35,6 +35,22 @@ const App = {
         this.setupReportesCompletos();
         this.setupPendientesClick();
         this.setupUserMenu();
+        
+        // Actualizar todas las vistas después de cargar
+        setTimeout(() => {
+            this.actualizarTodasLasVistas();
+        }, 500);
+    },
+    
+    // ===== ACTUALIZAR TODAS LAS VISTAS =====
+    actualizarTodasLasVistas() {
+        console.log('🔄 Actualizando todas las vistas');
+        this.renderizarProductos();
+        this.cargarInventario();
+        this.cargarVentasRecientes();
+        this.cargarTodasLasVentas();
+        this.actualizarDashboard();
+        this.actualizarVistasPendientes();
     },
     
     // ===== MENÚ DE USUARIO =====
@@ -271,7 +287,6 @@ const App = {
         });
         
         container.innerHTML = html;
-        this.cargarInventario();
     },
     
     // ===== CARRITO Y VENTAS =====
@@ -424,6 +439,7 @@ const App = {
                     
                     producto.stock -= item.cantidad;
                 } catch (error) {
+                    console.error('Error actualizando stock:', error);
                     exito = false;
                     break;
                 }
@@ -433,6 +449,10 @@ const App = {
                 this.ventas.push(venta);
                 localStorage.setItem('ventas', JSON.stringify(this.ventas));
                 this.renderizarProductos();
+                this.cargarInventario();
+                this.cargarVentasRecientes();
+                this.cargarTodasLasVentas();
+                this.actualizarDashboard();
                 this.mostrarNotificacion(`✅ Venta completada: $${total.toFixed(2)}`);
             }
         } else {
@@ -440,6 +460,8 @@ const App = {
             localStorage.setItem('ventas_pendientes', JSON.stringify(this.ventasPendientes));
             this.mostrarNotificacion(`⏳ Venta guardada offline - Se sincronizará automáticamente`);
             this.actualizarVistasPendientes();
+            this.cargarVentasRecientes();
+            this.cargarTodasLasVentas();
         }
         
         this.carrito = [];
@@ -460,13 +482,17 @@ const App = {
         for (const venta of this.ventasPendientes) {
             try {
                 for (const item of venta.productos) {
-                    await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            stock: 0 // Simplificado - en producción debería calcularse
-                        })
-                    });
+                    const producto = this.productos.find(p => p.id === item.id);
+                    if (producto) {
+                        await fetch(`${API_URL}/api/dueno/productos/${item.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                stock: producto.stock - item.cantidad
+                            })
+                        });
+                        producto.stock -= item.cantidad;
+                    }
                 }
                 
                 venta.estado = 'completada';
@@ -477,13 +503,18 @@ const App = {
             }
         }
         
-        this.ventasPendientes = [];
+        this.ventasPendientes = this.ventasPendientes.filter(v => v.estado === 'pendiente');
         localStorage.setItem('ventas', JSON.stringify(this.ventas));
-        localStorage.setItem('ventas_pendientes', '[]');
+        localStorage.setItem('ventas_pendientes', JSON.stringify(this.ventasPendientes));
         
         this.sincronizando = false;
         this.actualizarEstadoConexion();
         this.actualizarVistasPendientes();
+        this.renderizarProductos();
+        this.cargarInventario();
+        this.cargarVentasRecientes();
+        this.cargarTodasLasVentas();
+        this.actualizarDashboard();
         
         if (sincronizadas > 0) {
             this.mostrarNotificacion(`✅ ${sincronizadas} ventas sincronizadas`);
@@ -495,7 +526,6 @@ const App = {
         const pendienteCount = document.getElementById('pendienteCount');
         if (pendienteCount) pendienteCount.textContent = this.ventasPendientes.length;
         this.mostrarBannerPendientes();
-        this.cargarVentasRecientes();
     },
     
     mostrarBannerPendientes() {
@@ -567,15 +597,38 @@ const App = {
     },
     
     setupPendientesClick() {
-        const card = document.getElementById('pendienteCount')?.parentElement?.parentElement;
-        if (card) {
-            card.addEventListener('click', () => this.mostrarDetallePendientes());
-            card.style.cursor = 'pointer';
+        const pendienteCount = document.getElementById('pendienteCount');
+        if (pendienteCount) {
+            const card = pendienteCount.closest('.card');
+            if (card) {
+                card.addEventListener('click', () => this.mostrarDetallePendientes());
+                card.style.cursor = 'pointer';
+            }
         }
+    },
+    
+    // ===== DASHBOARD =====
+    actualizarDashboard() {
+        const ventasHoy = document.getElementById('ventasHoyCount');
+        const totalProductos = document.getElementById('totalProductosCount');
+        const pendienteCount = document.getElementById('pendienteCount');
+        const carritoCount = document.getElementById('carritoCount');
+        
+        if (ventasHoy) {
+            const hoy = new Date().toDateString();
+            const ventasHoyCount = this.ventas.filter(v => new Date(v.fecha).toDateString() === hoy).length;
+            ventasHoy.textContent = ventasHoyCount;
+        }
+        
+        if (totalProductos) totalProductos.textContent = this.productos.length;
+        if (pendienteCount) pendienteCount.textContent = this.ventasPendientes.length;
+        if (carritoCount) carritoCount.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
     },
     
     // ===== REPORTES COMPLETOS =====
     setupReportesCompletos() {
+        console.log('📊 Configurando reportes completos');
+        
         const hoy = new Date().toISOString().split('T')[0];
         const dateInput = document.getElementById('reportDate');
         if (dateInput) dateInput.value = hoy;
@@ -583,6 +636,7 @@ const App = {
         const generateBtn = document.getElementById('generateReportBtn');
         if (generateBtn) {
             generateBtn.addEventListener('click', () => {
+                console.log('📊 Generando reporte...');
                 this.generarReporte(dateInput?.value || hoy);
             });
         }
@@ -597,36 +651,45 @@ const App = {
             excelBtn.addEventListener('click', () => this.generarReporteExcel());
         }
         
-        // Agregar botón para enviar al dueño
-        const exportSection = document.querySelector('.export-section .export-buttons');
-        if (exportSection && !document.getElementById('enviarDueñoBtn')) {
-            const enviarBtn = document.createElement('button');
-            enviarBtn.id = 'enviarDueñoBtn';
-            enviarBtn.className = 'btn btn-primary';
-            enviarBtn.innerHTML = '📤 Enviar al Dueño';
-            enviarBtn.style.marginTop = '10px';
-            enviarBtn.onclick = () => this.enviarReporteAlDueño();
-            exportSection.appendChild(enviarBtn);
-        }
-        
-        const exportInventoryBtn = document.getElementById('exportInventoryBtn');
-        if (exportInventoryBtn) {
-            exportInventoryBtn.addEventListener('click', () => {
-                this.mostrarNotificacion('📤 Exportando inventario...');
-                setTimeout(() => this.mostrarNotificacion('✅ Inventario exportado'), 1500);
-            });
-        }
-        
+        // Botón de actualizar inventario
         const refreshInventoryBtn = document.getElementById('refreshInventoryBtn');
         if (refreshInventoryBtn) {
+            console.log('🔄 Configurando botón actualizar inventario');
             refreshInventoryBtn.addEventListener('click', () => {
+                console.log('🔄 Actualizando inventario...');
                 this.cargarProductosDelServidor();
                 this.mostrarNotificacion('🔄 Inventario actualizado');
             });
+        } else {
+            console.warn('⚠️ Botón refreshInventoryBtn no encontrado');
         }
+        
+        // Eliminar botón de exportar inventario si existe
+        const exportInventoryBtn = document.getElementById('exportInventoryBtn');
+        if (exportInventoryBtn) {
+            exportInventoryBtn.remove();
+        }
+        
+        // Botón enviar al dueño
+        setTimeout(() => {
+            const exportSection = document.querySelector('.export-section .export-buttons');
+            if (exportSection && !document.getElementById('enviarDueñoBtn')) {
+                console.log('📤 Agregando botón enviar al dueño');
+                const enviarBtn = document.createElement('button');
+                enviarBtn.id = 'enviarDueñoBtn';
+                enviarBtn.className = 'btn btn-primary';
+                enviarBtn.innerHTML = '📤 Enviar al Dueño';
+                enviarBtn.style.marginTop = '10px';
+                enviarBtn.style.width = '100%';
+                enviarBtn.onclick = () => this.enviarReporteAlDueño();
+                exportSection.appendChild(enviarBtn);
+            }
+        }, 1000);
     },
     
     generarReporte(fecha) {
+        console.log('📊 Generando reporte para fecha:', fecha);
+        
         const ventas = this.ventas.filter(v => v.fecha.split('T')[0] === fecha);
         const pendientes = this.ventasPendientes.filter(v => v.fecha.split('T')[0] === fecha);
         const total = ventas.reduce((s, v) => s + v.total, 0);
@@ -653,7 +716,7 @@ const App = {
             });
             
             categorySales.innerHTML = `
-                <div style="color:#f39c12; margin-bottom:8px;">⏳ Pendientes: $${totalPend.toFixed(2)}</div>
+                <div style="color:#f39c12; margin-bottom:8px; font-weight:bold;">⏳ Pendientes: $${totalPend.toFixed(2)}</div>
                 ${cats}
             `;
         }
@@ -661,6 +724,8 @@ const App = {
         if (bestProduct) bestProduct.textContent = this.productos[0]?.nombre || '-';
         if (bestHour) bestHour.textContent = '15:00 - 17:00';
         if (topCategory) topCategory.textContent = this.categorias[0]?.nombre || '-';
+        
+        this.mostrarNotificacion('📊 Reporte generado');
     },
     
     generarReportePDF() {
@@ -803,6 +868,160 @@ const App = {
         }
     },
     
+    // ===== VENTAS RECIENTES =====
+    cargarVentasRecientes() {
+        const container = document.getElementById('ventasRecientesContainer');
+        if (!container) {
+            console.warn('⚠️ Container ventasRecientesContainer no encontrado');
+            return;
+        }
+        
+        const todas = [
+            ...this.ventasPendientes.map(v => ({...v, estado: 'pendiente'})),
+            ...this.ventas
+        ];
+        
+        if (todas.length === 0) {
+            container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
+            return;
+        }
+        
+        const recientes = [...todas].reverse().slice(0, 5);
+        let html = '';
+        
+        recientes.forEach(v => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
+            
+            html += `
+                <div class="history-item" style="${v.estado === 'pendiente' ? 'border-left:4px solid #f39c12; background:#fff3e0;' : ''}">
+                    <div>
+                        <div style="font-weight:600;">${v.cliente}</div>
+                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
+                    </div>
+                    <div>${cantidadTotal} producto${cantidadTotal !== 1 ? 's' : ''}</div>
+                    <div style="color:var(--accent-color); font-weight:bold;">$${v.total.toFixed(2)}</div>
+                    <div><span class="status ${v.estado === 'pendiente' ? 'status-warning' : 'status-completed'}">
+                        ${v.estado === 'pendiente' ? 'Pendiente' : 'Completada'}
+                    </span></div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    },
+    
+    cargarTodasLasVentas() {
+        const container = document.getElementById('allSalesContainer');
+        const totalAmount = document.getElementById('totalSalesAmount');
+        const avgAmount = document.getElementById('avgSaleAmount');
+        const totalCount = document.getElementById('totalSalesCount');
+        
+        if (!container) {
+            console.warn('⚠️ Container allSalesContainer no encontrado');
+            return;
+        }
+        
+        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
+            container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
+            if (totalAmount) totalAmount.textContent = '$0.00';
+            if (avgAmount) avgAmount.textContent = '$0.00';
+            if (totalCount) totalCount.textContent = '0';
+            return;
+        }
+        
+        const total = this.ventas.reduce((s, v) => s + v.total, 0);
+        const promedio = this.ventas.length > 0 ? total / this.ventas.length : 0;
+        
+        if (totalAmount) totalAmount.textContent = `$${total.toFixed(2)}`;
+        if (avgAmount) avgAmount.textContent = `$${promedio.toFixed(2)}`;
+        if (totalCount) totalCount.textContent = this.ventas.length;
+        
+        let html = '';
+        
+        [...this.ventas].reverse().forEach(v => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
+            
+            html += `
+                <div class="history-item">
+                    <div>
+                        <div style="font-weight:600;">${v.cliente}</div>
+                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
+                    </div>
+                    <div>${cantidadTotal} producto${cantidadTotal !== 1 ? 's' : ''}</div>
+                    <div style="color:var(--accent-color); font-weight:bold;">$${v.total.toFixed(2)}</div>
+                    <div><span class="status status-completed">Completada</span></div>
+                </div>
+            `;
+        });
+        
+        this.ventasPendientes.forEach(v => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
+            
+            html += `
+                <div class="history-item" style="border-left:4px solid #f39c12; background:#fff3e0;">
+                    <div>
+                        <div style="font-weight:600;">${v.cliente}</div>
+                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
+                    </div>
+                    <div>${cantidadTotal} producto${cantidadTotal !== 1 ? 's' : ''}</div>
+                    <div style="color:var(--accent-color); font-weight:bold;">$${v.total.toFixed(2)}</div>
+                    <div><span class="status status-warning">Pendiente</span></div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    },
+    
+    // ===== INVENTARIO =====
+    cargarInventario() {
+        const tableBody = document.getElementById('inventoryTableBody');
+        const lowStockSpan = document.getElementById('lowStockCount');
+        const outStockSpan = document.getElementById('outOfStockCount');
+        
+        if (!tableBody) {
+            console.warn('⚠️ Tabla de inventario no encontrada');
+            return;
+        }
+        
+        if (this.productos.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">No hay productos en inventario</td></tr>';
+            return;
+        }
+        
+        const lowStock = this.productos.filter(p => p.stock > 0 && p.stock < 5).length;
+        const outStock = this.productos.filter(p => p.stock === 0).length;
+        
+        if (lowStockSpan) lowStockSpan.textContent = lowStock;
+        if (outStockSpan) outStockSpan.textContent = outStock;
+        
+        let html = '';
+        this.productos.forEach(p => {
+            const catNombre = this.obtenerNombreCategoria(p.categoria);
+            let estado = 'Disponible', clase = '';
+            if (p.stock === 0) {
+                estado = 'Agotado';
+                clase = 'status-danger';
+            } else if (p.stock < 5) {
+                estado = 'Stock Bajo';
+                clase = 'status-warning';
+            }
+            
+            html += `<tr>
+                <td>${p.nombre}</td>
+                <td>${catNombre}</td>
+                <td>$${p.precio.toFixed(2)}</td>
+                <td>${p.stock}</td>
+                <td><span class="${clase}">${estado}</span></td>
+            </tr>`;
+        });
+        
+        tableBody.innerHTML = html;
+    },
+    
     // ===== SPLASH SCREEN =====
     hideSplashScreen() {
         setTimeout(() => {
@@ -829,7 +1048,9 @@ const App = {
                 this.cargarVentasLocales();
                 this.actualizarInfoUsuario();
                 this.setupUserMenu();
+                setTimeout(() => this.actualizarTodasLasVistas(), 500);
             } catch (e) {
+                console.error('Error cargando usuario:', e);
                 this.showLoginPanel();
             }
         } else {
@@ -869,6 +1090,7 @@ const App = {
                 await this.cargarCategoriasDelServidor();
                 await this.cargarProductosDelServidor();
                 await this.cargarVentasLocales();
+                this.actualizarTodasLasVistas();
                 
                 this.showError('', 'clear');
                 this.mostrarNotificacion(`✅ Bienvenida, ${this.usuario.nombre}`);
@@ -876,6 +1098,7 @@ const App = {
                 this.showError(data.error || 'Credenciales incorrectas');
             }
         } catch (error) {
+            console.error('Error en login:', error);
             this.showError('Error de conexión');
         } finally {
             btn.disabled = false;
@@ -894,10 +1117,16 @@ const App = {
     
     cargarVentasLocales() {
         const ventas = localStorage.getItem('ventas');
-        if (ventas) this.ventas = JSON.parse(ventas);
+        if (ventas) {
+            this.ventas = JSON.parse(ventas);
+            console.log('📊 Ventas cargadas:', this.ventas.length);
+        }
         
         const pendientes = localStorage.getItem('ventas_pendientes');
-        if (pendientes) this.ventasPendientes = JSON.parse(pendientes);
+        if (pendientes) {
+            this.ventasPendientes = JSON.parse(pendientes);
+            console.log('⏳ Ventas pendientes cargadas:', this.ventasPendientes.length);
+        }
     },
     
     // ===== NAVEGACIÓN =====
@@ -927,8 +1156,14 @@ const App = {
         
         this.currentPage = page;
         
-        if (page === 'products') this.cargarInventario();
-        else if (page === 'sales') this.cargarTodasLasVentas();
+        if (page === 'products') {
+            this.cargarInventario();
+        } else if (page === 'sales') {
+            this.cargarTodasLasVentas();
+        } else if (page === 'dashboard') {
+            this.actualizarDashboard();
+            this.cargarVentasRecientes();
+        }
     },
     
     // ===== BÚSQUEDA =====
@@ -991,144 +1226,6 @@ const App = {
         if (completeBtn) {
             completeBtn.addEventListener('click', () => this.completarVenta());
         }
-    },
-    
-    // ===== INVENTARIO =====
-    cargarInventario() {
-        const tableBody = document.getElementById('inventoryTableBody');
-        const lowStockSpan = document.getElementById('lowStockCount');
-        const outStockSpan = document.getElementById('outOfStockCount');
-        
-        if (!tableBody) return;
-        
-        if (this.productos.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">No hay productos en inventario</td></tr>';
-            return;
-        }
-        
-        const lowStock = this.productos.filter(p => p.stock > 0 && p.stock < 5).length;
-        const outStock = this.productos.filter(p => p.stock === 0).length;
-        
-        if (lowStockSpan) lowStockSpan.textContent = lowStock;
-        if (outStockSpan) outStockSpan.textContent = outStock;
-        
-        let html = '';
-        this.productos.forEach(p => {
-            const catNombre = this.obtenerNombreCategoria(p.categoria);
-            let estado = 'Disponible', clase = '';
-            if (p.stock === 0) {
-                estado = 'Agotado';
-                clase = 'status-danger';
-            } else if (p.stock < 5) {
-                estado = 'Stock Bajo';
-                clase = 'status-warning';
-            }
-            
-            html += `<tr>
-                <td>${p.nombre}</td>
-                <td>${catNombre}</td>
-                <td>$${p.precio.toFixed(2)}</td>
-                <td>${p.stock}</td>
-                <td><span class="${clase}">${estado}</span></td>
-            </tr>`;
-        });
-        
-        tableBody.innerHTML = html;
-    },
-    
-    cargarTodasLasVentas() {
-        const container = document.getElementById('allSalesContainer');
-        const totalAmount = document.getElementById('totalSalesAmount');
-        const avgAmount = document.getElementById('avgSaleAmount');
-        const totalCount = document.getElementById('totalSalesCount');
-        
-        if (!container) return;
-        
-        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
-            container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
-            if (totalAmount) totalAmount.textContent = '$0.00';
-            if (avgAmount) avgAmount.textContent = '$0.00';
-            if (totalCount) totalCount.textContent = '0';
-            return;
-        }
-        
-        const total = this.ventas.reduce((s, v) => s + v.total, 0);
-        const promedio = this.ventas.length > 0 ? total / this.ventas.length : 0;
-        
-        if (totalAmount) totalAmount.textContent = `$${total.toFixed(2)}`;
-        if (avgAmount) avgAmount.textContent = `$${promedio.toFixed(2)}`;
-        if (totalCount) totalCount.textContent = this.ventas.length;
-        
-        let html = '';
-        
-        [...this.ventas].reverse().forEach(v => {
-            const fecha = new Date(v.fecha).toLocaleString();
-            html += `
-                <div class="history-item">
-                    <div>
-                        <div style="font-weight:600;">${v.cliente}</div>
-                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-                    </div>
-                    <div>${v.productos.reduce((s, i) => s + i.cantidad, 0)} productos</div>
-                    <div style="color:var(--accent-color);">$${v.total.toFixed(2)}</div>
-                    <div><span class="status status-completed">Completada</span></div>
-                </div>
-            `;
-        });
-        
-        this.ventasPendientes.forEach(v => {
-            const fecha = new Date(v.fecha).toLocaleString();
-            html += `
-                <div class="history-item" style="border-left:4px solid #f39c12; background:#fff3e0;">
-                    <div>
-                        <div style="font-weight:600;">${v.cliente}</div>
-                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-                    </div>
-                    <div>${v.productos.reduce((s, i) => s + i.cantidad, 0)} productos</div>
-                    <div style="color:var(--accent-color);">$${v.total.toFixed(2)}</div>
-                    <div><span class="status status-warning">Pendiente</span></div>
-                </div>
-            `;
-        });
-        
-        container.innerHTML = html;
-    },
-    
-    cargarVentasRecientes() {
-        const container = document.getElementById('ventasRecientesContainer');
-        if (!container) return;
-        
-        const todas = [
-            ...this.ventasPendientes.map(v => ({...v, estado: 'pendiente'})),
-            ...this.ventas
-        ];
-        
-        if (todas.length === 0) {
-            container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
-            return;
-        }
-        
-        const recientes = [...todas].reverse().slice(0, 5);
-        let html = '';
-        
-        recientes.forEach(v => {
-            const fecha = new Date(v.fecha).toLocaleString();
-            html += `
-                <div class="history-item" style="${v.estado === 'pendiente' ? 'border-left:4px solid #f39c12; background:#fff3e0;' : ''}">
-                    <div>
-                        <div style="font-weight:600;">${v.cliente}</div>
-                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-                    </div>
-                    <div>${v.productos.reduce((s, i) => s + i.cantidad, 0)} productos</div>
-                    <div style="color:var(--accent-color);">$${v.total.toFixed(2)}</div>
-                    <div><span class="status ${v.estado === 'pendiente' ? 'status-warning' : 'status-completed'}">
-                        ${v.estado === 'pendiente' ? 'Pendiente' : 'Completada'}
-                    </span></div>
-                </div>
-            `;
-        });
-        
-        container.innerHTML = html;
     },
     
     // ===== UTILIDADES =====
