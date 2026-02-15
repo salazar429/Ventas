@@ -1,6 +1,6 @@
 // ===========================================
-// APP VENDEDORA - VERSIÓN COMPLETAMENTE CORREGIDA
-// CON TODAS LAS FUNCIONALIDADES OPERATIVAS
+// APP VENDEDORA - VERSIÓN CORREGIDA
+// CON CONTADORES Y VENTAS RECIENTES FUNCIONANDO
 // ===========================================
 
 const API_URL = 'https://sistema-test-api.onrender.com';
@@ -45,6 +45,13 @@ const App = {
     // ===== ACTUALIZAR TODAS LAS VISTAS =====
     actualizarTodasLasVistas() {
         console.log('🔄 Actualizando todas las vistas');
+        console.log('📊 Datos actuales:', {
+            productos: this.productos.length,
+            ventas: this.ventas.length,
+            pendientes: this.ventasPendientes.length,
+            carrito: this.carrito.length
+        });
+        
         this.renderizarProductos();
         this.cargarInventario();
         this.cargarVentasRecientes();
@@ -53,68 +60,246 @@ const App = {
         this.actualizarVistasPendientes();
     },
     
-    // ===== MENÚ DE USUARIO =====
-    setupUserMenu() {
-        const avatar = document.getElementById('userAvatar');
-        if (!avatar) return;
+    // ===== DASHBOARD CORREGIDO =====
+    actualizarDashboard() {
+        console.log('📊 Actualizando dashboard');
         
-        const menu = document.createElement('div');
-        menu.id = 'userMenu';
-        menu.style.cssText = `
-            position: absolute;
-            top: 60px;
-            right: 10px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            width: 200px;
-            display: none;
-            z-index: 1000;
-            overflow: hidden;
-        `;
+        // Calcular ventas de hoy
+        const hoy = new Date().toDateString();
+        const ventasHoy = this.ventas.filter(v => new Date(v.fecha).toDateString() === hoy).length;
         
-        menu.innerHTML = `
-            <div style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #eee;">
-                <strong id="menuUserName">${this.usuario?.nombre || 'Vendedora'}</strong><br>
-                <small style="color: #666;" id="menuUserTienda">${this.usuario?.tienda || ''}</small>
-            </div>
-            <div style="padding: 8px 0;">
-                <div class="menu-item" onclick="alert('Configuración - Falta implementación')" style="padding: 10px 16px; cursor: pointer;">
-                    ⚙️ Ajustes
-                </div>
-                <div class="menu-item" onclick="alert('Tutoriales - Falta implementación')" style="padding: 10px 16px; cursor: pointer;">
-                    📚 Tutoriales
-                </div>
-                <div class="menu-item" onclick="App.logout()" style="padding: 10px 16px; cursor: pointer; color: #e74c3c;">
-                    🚪 Cerrar sesión
-                </div>
-            </div>
-        `;
+        // Elementos del dashboard
+        const ventasHoyEl = document.getElementById('ventasHoyCount');
+        const totalProductosEl = document.getElementById('totalProductosCount');
+        const pendienteEl = document.getElementById('pendienteCount');
+        const carritoEl = document.getElementById('carritoCount');
         
-        const style = document.createElement('style');
-        style.textContent = `
-            .menu-item:hover {
-                background-color: #f5f5f5;
-            }
-        `;
-        document.head.appendChild(style);
+        // Actualizar con verificación
+        if (ventasHoyEl) {
+            ventasHoyEl.textContent = ventasHoy;
+            console.log('✅ Ventas hoy actualizado:', ventasHoy);
+        } else {
+            console.warn('⚠️ Elemento ventasHoyCount no encontrado');
+        }
         
-        document.body.appendChild(menu);
+        if (totalProductosEl) {
+            totalProductosEl.textContent = this.productos.length;
+            console.log('✅ Total productos actualizado:', this.productos.length);
+        }
         
-        avatar.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isVisible = menu.style.display === 'block';
-            menu.style.display = isVisible ? 'none' : 'block';
+        if (pendienteEl) {
+            pendienteEl.textContent = this.ventasPendientes.length;
+            console.log('✅ Pendientes actualizado:', this.ventasPendientes.length);
+        }
+        
+        if (carritoEl) {
+            const totalCarrito = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
+            carritoEl.textContent = totalCarrito;
+            console.log('✅ Carrito actualizado:', totalCarrito);
+        }
+    },
+    
+    // ===== VENTAS RECIENTES CORREGIDO =====
+    cargarVentasRecientes() {
+        console.log('📋 Cargando ventas recientes');
+        const container = document.getElementById('ventasRecientesContainer');
+        
+        if (!container) {
+            console.warn('⚠️ Container ventasRecientesContainer no encontrado');
+            return;
+        }
+        
+        // Combinar ventas completadas y pendientes
+        const todas = [
+            ...this.ventasPendientes.map(v => ({...v, estado: 'pendiente'})),
+            ...this.ventas
+        ];
+        
+        console.log('📊 Total ventas para recientes:', todas.length);
+        
+        if (todas.length === 0) {
+            container.innerHTML = '<div class="empty-message" style="padding: 20px; text-align: center; color: #7f8c8d;">No hay ventas registradas</div>';
+            return;
+        }
+        
+        // Ordenar por fecha (más reciente primero) y tomar las 5 más recientes
+        const recientes = [...todas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 5);
+        
+        let html = '';
+        recientes.forEach((v, index) => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            const cantidadTotal = v.productos.reduce((sum, item) => sum + item.cantidad, 0);
             
-            document.getElementById('menuUserName').textContent = this.usuario?.nombre || 'Vendedora';
-            document.getElementById('menuUserTienda').textContent = this.usuario?.tienda || '';
+            html += `
+                <div class="history-item" style="${v.estado === 'pendiente' ? 'border-left: 4px solid #f39c12; background: #fff3e0; margin-bottom: 8px;' : 'margin-bottom: 8px;'}">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; align-items: center; padding: 8px;">
+                        <div>
+                            <div style="font-weight: 600;">${v.cliente}</div>
+                            <div style="font-size: 0.75rem; color: #666;">${fecha}</div>
+                        </div>
+                        <div>${cantidadTotal} prod</div>
+                        <div style="color: #2ecc71; font-weight: bold;">$${v.total.toFixed(2)}</div>
+                        <div><span class="status ${v.estado === 'pendiente' ? 'status-warning' : 'status-completed'}">${v.estado === 'pendiente' ? 'Pendiente' : 'Completada'}</span></div>
+                    </div>
+                </div>
+            `;
         });
         
-        document.addEventListener('click', (e) => {
-            if (!menu.contains(e.target) && e.target !== avatar) {
-                menu.style.display = 'none';
+        container.innerHTML = html;
+        console.log('✅ Ventas recientes actualizadas');
+    },
+    
+    // ===== INVENTARIO CORREGIDO =====
+    cargarInventario() {
+        console.log('📦 Cargando inventario');
+        
+        const tableBody = document.getElementById('inventoryTableBody');
+        const lowStockSpan = document.getElementById('lowStockCount');
+        const outStockSpan = document.getElementById('outOfStockCount');
+        
+        if (!tableBody) {
+            console.warn('⚠️ Tabla de inventario no encontrada');
+            return;
+        }
+        
+        if (this.productos.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">No hay productos en inventario</td></tr>';
+            if (lowStockSpan) lowStockSpan.textContent = '0';
+            if (outStockSpan) outStockSpan.textContent = '0';
+            return;
+        }
+        
+        // Calcular estadísticas
+        const lowStock = this.productos.filter(p => p.stock > 0 && p.stock < 5).length;
+        const outStock = this.productos.filter(p => p.stock === 0).length;
+        
+        console.log('📊 Estadísticas inventario:', { total: this.productos.length, lowStock, outStock });
+        
+        // Actualizar contadores
+        if (lowStockSpan) {
+            lowStockSpan.textContent = lowStock;
+            console.log('✅ Stock bajo actualizado:', lowStock);
+        }
+        
+        if (outStockSpan) {
+            outStockSpan.textContent = outStock;
+            console.log('✅ Stock agotado actualizado:', outStock);
+        }
+        
+        // Generar tabla
+        let html = '';
+        this.productos.forEach(p => {
+            const catNombre = this.obtenerNombreCategoria(p.categoria);
+            let estado = 'Disponible';
+            let clase = '';
+            
+            if (p.stock === 0) {
+                estado = 'Agotado';
+                clase = 'status-danger';
+            } else if (p.stock < 5) {
+                estado = 'Stock Bajo';
+                clase = 'status-warning';
             }
+            
+            html += `<tr>
+                <td>${p.nombre}</td>
+                <td>${catNombre}</td>
+                <td>$${p.precio.toFixed(2)}</td>
+                <td>${p.stock}</td>
+                <td><span class="${clase}" style="font-weight: 600;">${estado}</span></td>
+            </tr>`;
         });
+        
+        tableBody.innerHTML = html;
+        console.log('✅ Inventario actualizado');
+    },
+    
+    // ===== VENTAS PENDIENTES =====
+    actualizarVistasPendientes() {
+        const pendienteCount = document.getElementById('pendienteCount');
+        if (pendienteCount) {
+            pendienteCount.textContent = this.ventasPendientes.length;
+        }
+        this.mostrarBannerPendientes();
+    },
+    
+    mostrarBannerPendientes() {
+        const bannerExistente = document.getElementById('pendientesBanner');
+        if (bannerExistente) bannerExistente.remove();
+        
+        if (this.ventasPendientes.length === 0) return;
+        
+        const banner = document.createElement('div');
+        banner.id = 'pendientesBanner';
+        banner.style.cssText = `
+            background: #f39c12;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 10px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            z-index: 100;
+        `;
+        
+        banner.innerHTML = `
+            <span style="font-size: 1.5rem;">⏳</span>
+            <div style="flex: 1; margin-left: 12px;">
+                <strong>${this.ventasPendientes.length} venta${this.ventasPendientes.length !== 1 ? 's' : ''} pendiente${this.ventasPendientes.length !== 1 ? 's' : ''}</strong><br>
+                <small>${this.online ? 'Pendientes de sincronizar' : 'Sin conexión - se sincronizarán automáticamente'}</small>
+            </div>
+            ${this.online ? '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:4px 12px; border-radius:20px; cursor:pointer;" onclick="event.stopPropagation(); App.forzarSincronizacion()">🔄 Sincronizar</button>' : ''}
+        `;
+        
+        banner.onclick = () => this.mostrarDetallePendientes();
+        
+        const header = document.querySelector('header');
+        if (header) {
+            header.insertAdjacentElement('afterend', banner);
+        }
+    },
+    
+    mostrarDetallePendientes() {
+        if (this.ventasPendientes.length === 0) {
+            this.mostrarNotificacion('No hay ventas pendientes');
+            return;
+        }
+        
+        let mensaje = '📋 VENTAS PENDIENTES:\n\n';
+        let total = 0;
+        
+        this.ventasPendientes.forEach((v, i) => {
+            mensaje += `${i+1}. ${v.cliente} - $${v.total.toFixed(2)}\n`;
+            v.productos.forEach(p => {
+                mensaje += `   • ${p.nombre} x${p.cantidad}\n`;
+            });
+            total += v.total;
+        });
+        
+        mensaje += `\n💰 TOTAL PENDIENTE: $${total.toFixed(2)}`;
+        alert(mensaje);
+    },
+    
+    async forzarSincronizacion() {
+        if (!this.online) {
+            this.mostrarNotificacion('❌ Sin conexión a internet');
+            return;
+        }
+        await this.sincronizarVentasPendientes();
+    },
+    
+    setupPendientesClick() {
+        const pendienteCount = document.getElementById('pendienteCount');
+        if (pendienteCount) {
+            const card = pendienteCount.closest('.card');
+            if (card) {
+                card.addEventListener('click', () => this.mostrarDetallePendientes());
+                card.style.cursor = 'pointer';
+            }
+        }
     },
     
     // ===== ESTADO DE CONEXIÓN =====
@@ -233,6 +418,7 @@ const App = {
             if (this.usuario) {
                 this.renderizarProductos();
                 this.cargarInventario();
+                this.actualizarDashboard();
             }
             
             return productos;
@@ -249,6 +435,7 @@ const App = {
             if (this.usuario) {
                 this.renderizarProductos();
                 this.cargarInventario();
+                this.actualizarDashboard();
             }
         }
         return this.productos;
@@ -259,7 +446,7 @@ const App = {
         if (!container) return;
         
         if (this.productos.length === 0) {
-            container.innerHTML = '<div class="empty-message">No hay productos disponibles</div>';
+            container.innerHTML = '<div class="empty-message" style="text-align:center; padding:40px;">No hay productos disponibles</div>';
             return;
         }
         
@@ -324,12 +511,14 @@ const App = {
         }
         
         this.actualizarCarrito();
+        this.actualizarDashboard(); // Actualizar contador del carrito
         this.mostrarNotificacion(`✅ ${producto.nombre} x${cantidad} agregado`);
     },
     
     quitarDelCarrito(productoId) {
         this.carrito = this.carrito.filter(item => item.id !== productoId);
         this.actualizarCarrito();
+        this.actualizarDashboard(); // Actualizar contador del carrito
     },
     
     limpiarCarrito() {
@@ -337,6 +526,7 @@ const App = {
         if (confirm('¿Cancelar la venta actual?')) {
             this.carrito = [];
             this.actualizarCarrito();
+            this.actualizarDashboard(); // Actualizar contador del carrito
             document.getElementById('currentSalePanel')?.classList.remove('active');
         }
     },
@@ -345,7 +535,6 @@ const App = {
         const container = document.getElementById('saleItemsContainer');
         const itemsCount = document.getElementById('saleItemsCount');
         const cartBadge = document.getElementById('cartBadge');
-        const carritoCount = document.getElementById('carritoCount');
         const subtotalSpan = document.getElementById('subtotal');
         const totalSpan = document.getElementById('total');
         
@@ -358,7 +547,6 @@ const App = {
                 cartBadge.textContent = '0';
                 cartBadge.style.display = 'none';
             }
-            if (carritoCount) carritoCount.textContent = '0';
             if (subtotalSpan) subtotalSpan.textContent = '$0.00';
             if (totalSpan) totalSpan.textContent = '$0.00';
             return;
@@ -388,7 +576,6 @@ const App = {
             cartBadge.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
             cartBadge.style.display = 'flex';
         }
-        if (carritoCount) carritoCount.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
         if (subtotalSpan) subtotalSpan.textContent = `$${subtotal.toFixed(2)}`;
         if (totalSpan) totalSpan.textContent = `$${subtotal.toFixed(2)}`;
     },
@@ -462,6 +649,7 @@ const App = {
             this.actualizarVistasPendientes();
             this.cargarVentasRecientes();
             this.cargarTodasLasVentas();
+            this.actualizarDashboard();
         }
         
         this.carrito = [];
@@ -521,108 +709,74 @@ const App = {
         }
     },
     
-    // ===== VENTAS PENDIENTES =====
-    actualizarVistasPendientes() {
-        const pendienteCount = document.getElementById('pendienteCount');
-        if (pendienteCount) pendienteCount.textContent = this.ventasPendientes.length;
-        this.mostrarBannerPendientes();
-    },
-    
-    mostrarBannerPendientes() {
-        const bannerExistente = document.getElementById('pendientesBanner');
-        if (bannerExistente) bannerExistente.remove();
+    // ===== TODAS LAS VENTAS =====
+    cargarTodasLasVentas() {
+        const container = document.getElementById('allSalesContainer');
+        const totalAmount = document.getElementById('totalSalesAmount');
+        const avgAmount = document.getElementById('avgSaleAmount');
+        const totalCount = document.getElementById('totalSalesCount');
         
-        if (this.ventasPendientes.length === 0) return;
-        
-        const banner = document.createElement('div');
-        banner.id = 'pendientesBanner';
-        banner.style.cssText = `
-            background: #f39c12;
-            color: white;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin: 10px 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            cursor: pointer;
-            z-index: 100;
-        `;
-        
-        banner.innerHTML = `
-            <span style="font-size: 1.5rem;">⏳</span>
-            <div style="flex: 1; margin-left: 12px;">
-                <strong>${this.ventasPendientes.length} venta${this.ventasPendientes.length !== 1 ? 's' : ''} pendiente${this.ventasPendientes.length !== 1 ? 's' : ''}</strong><br>
-                <small>${this.online ? 'Listas para sincronizar' : 'Sin conexión - se sincronizarán automáticamente'}</small>
-            </div>
-            ${this.online ? '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2); border:none; color:white;" onclick="event.stopPropagation(); App.forzarSincronizacion()">🔄 Sincronizar ahora</button>' : ''}
-        `;
-        
-        banner.onclick = () => this.mostrarDetallePendientes();
-        
-        const header = document.querySelector('header');
-        if (header) {
-            header.insertAdjacentElement('afterend', banner);
-        }
-    },
-    
-    mostrarDetallePendientes() {
-        if (this.ventasPendientes.length === 0) {
-            this.mostrarNotificacion('No hay ventas pendientes');
+        if (!container) {
+            console.warn('⚠️ Container allSalesContainer no encontrado');
             return;
         }
         
-        let mensaje = '📋 VENTAS PENDIENTES:\n\n';
-        let total = 0;
+        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
+            container.innerHTML = '<div class="empty-message" style="padding: 20px; text-align: center;">No hay ventas registradas</div>';
+            if (totalAmount) totalAmount.textContent = '$0.00';
+            if (avgAmount) avgAmount.textContent = '$0.00';
+            if (totalCount) totalCount.textContent = '0';
+            return;
+        }
         
-        this.ventasPendientes.forEach((v, i) => {
-            mensaje += `${i+1}. ${v.cliente} - $${v.total.toFixed(2)}\n`;
-            v.productos.forEach(p => {
-                mensaje += `   • ${p.nombre} x${p.cantidad}\n`;
-            });
-            total += v.total;
+        const total = this.ventas.reduce((s, v) => s + v.total, 0);
+        const promedio = this.ventas.length > 0 ? total / this.ventas.length : 0;
+        
+        if (totalAmount) totalAmount.textContent = `$${total.toFixed(2)}`;
+        if (avgAmount) avgAmount.textContent = `$${promedio.toFixed(2)}`;
+        if (totalCount) totalCount.textContent = this.ventas.length;
+        
+        let html = '';
+        
+        [...this.ventas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).forEach(v => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
+            
+            html += `
+                <div class="history-item" style="margin-bottom: 8px;">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; align-items: center; padding: 8px;">
+                        <div>
+                            <div style="font-weight: 600;">${v.cliente}</div>
+                            <div style="font-size: 0.75rem; color: #666;">${fecha}</div>
+                        </div>
+                        <div>${cantidadTotal} prod</div>
+                        <div style="color: #2ecc71; font-weight: bold;">$${v.total.toFixed(2)}</div>
+                        <div><span class="status status-completed">Completada</span></div>
+                    </div>
+                </div>
+            `;
         });
         
-        mensaje += `\n💰 TOTAL PENDIENTE: $${total.toFixed(2)}`;
-        alert(mensaje);
-    },
-    
-    async forzarSincronizacion() {
-        if (!this.online) {
-            this.mostrarNotificacion('❌ Sin conexión a internet');
-            return;
-        }
-        await this.sincronizarVentasPendientes();
-    },
-    
-    setupPendientesClick() {
-        const pendienteCount = document.getElementById('pendienteCount');
-        if (pendienteCount) {
-            const card = pendienteCount.closest('.card');
-            if (card) {
-                card.addEventListener('click', () => this.mostrarDetallePendientes());
-                card.style.cursor = 'pointer';
-            }
-        }
-    },
-    
-    // ===== DASHBOARD =====
-    actualizarDashboard() {
-        const ventasHoy = document.getElementById('ventasHoyCount');
-        const totalProductos = document.getElementById('totalProductosCount');
-        const pendienteCount = document.getElementById('pendienteCount');
-        const carritoCount = document.getElementById('carritoCount');
+        this.ventasPendientes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).forEach(v => {
+            const fecha = new Date(v.fecha).toLocaleString();
+            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
+            
+            html += `
+                <div class="history-item" style="border-left: 4px solid #f39c12; background: #fff3e0; margin-bottom: 8px;">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; align-items: center; padding: 8px;">
+                        <div>
+                            <div style="font-weight: 600;">${v.cliente}</div>
+                            <div style="font-size: 0.75rem; color: #666;">${fecha}</div>
+                        </div>
+                        <div>${cantidadTotal} prod</div>
+                        <div style="color: #2ecc71; font-weight: bold;">$${v.total.toFixed(2)}</div>
+                        <div><span class="status status-warning">Pendiente</span></div>
+                    </div>
+                </div>
+            `;
+        });
         
-        if (ventasHoy) {
-            const hoy = new Date().toDateString();
-            const ventasHoyCount = this.ventas.filter(v => new Date(v.fecha).toDateString() === hoy).length;
-            ventasHoy.textContent = ventasHoyCount;
-        }
-        
-        if (totalProductos) totalProductos.textContent = this.productos.length;
-        if (pendienteCount) pendienteCount.textContent = this.ventasPendientes.length;
-        if (carritoCount) carritoCount.textContent = this.carrito.reduce((sum, i) => sum + i.cantidad, 0);
+        container.innerHTML = html;
     },
     
     // ===== REPORTES COMPLETOS =====
@@ -651,23 +805,12 @@ const App = {
             excelBtn.addEventListener('click', () => this.generarReporteExcel());
         }
         
-        // Botón de actualizar inventario
         const refreshInventoryBtn = document.getElementById('refreshInventoryBtn');
         if (refreshInventoryBtn) {
-            console.log('🔄 Configurando botón actualizar inventario');
             refreshInventoryBtn.addEventListener('click', () => {
-                console.log('🔄 Actualizando inventario...');
                 this.cargarProductosDelServidor();
                 this.mostrarNotificacion('🔄 Inventario actualizado');
             });
-        } else {
-            console.warn('⚠️ Botón refreshInventoryBtn no encontrado');
-        }
-        
-        // Eliminar botón de exportar inventario si existe
-        const exportInventoryBtn = document.getElementById('exportInventoryBtn');
-        if (exportInventoryBtn) {
-            exportInventoryBtn.remove();
         }
         
         // Botón enviar al dueño
@@ -868,158 +1011,68 @@ const App = {
         }
     },
     
-    // ===== VENTAS RECIENTES =====
-    cargarVentasRecientes() {
-        const container = document.getElementById('ventasRecientesContainer');
-        if (!container) {
-            console.warn('⚠️ Container ventasRecientesContainer no encontrado');
-            return;
-        }
+    // ===== MENÚ DE USUARIO =====
+    setupUserMenu() {
+        const avatar = document.getElementById('userAvatar');
+        if (!avatar) return;
         
-        const todas = [
-            ...this.ventasPendientes.map(v => ({...v, estado: 'pendiente'})),
-            ...this.ventas
-        ];
+        const menu = document.createElement('div');
+        menu.id = 'userMenu';
+        menu.style.cssText = `
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: 200px;
+            display: none;
+            z-index: 1000;
+            overflow: hidden;
+        `;
         
-        if (todas.length === 0) {
-            container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
-            return;
-        }
-        
-        const recientes = [...todas].reverse().slice(0, 5);
-        let html = '';
-        
-        recientes.forEach(v => {
-            const fecha = new Date(v.fecha).toLocaleString();
-            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
-            
-            html += `
-                <div class="history-item" style="${v.estado === 'pendiente' ? 'border-left:4px solid #f39c12; background:#fff3e0;' : ''}">
-                    <div>
-                        <div style="font-weight:600;">${v.cliente}</div>
-                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-                    </div>
-                    <div>${cantidadTotal} producto${cantidadTotal !== 1 ? 's' : ''}</div>
-                    <div style="color:var(--accent-color); font-weight:bold;">$${v.total.toFixed(2)}</div>
-                    <div><span class="status ${v.estado === 'pendiente' ? 'status-warning' : 'status-completed'}">
-                        ${v.estado === 'pendiente' ? 'Pendiente' : 'Completada'}
-                    </span></div>
+        menu.innerHTML = `
+            <div style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #eee;">
+                <strong id="menuUserName">${this.usuario?.nombre || 'Vendedora'}</strong><br>
+                <small style="color: #666;" id="menuUserTienda">${this.usuario?.tienda || ''}</small>
+            </div>
+            <div style="padding: 8px 0;">
+                <div class="menu-item" onclick="alert('Configuración - Falta implementación')" style="padding: 10px 16px; cursor: pointer;">
+                    ⚙️ Ajustes
                 </div>
-            `;
-        });
-        
-        container.innerHTML = html;
-    },
-    
-    cargarTodasLasVentas() {
-        const container = document.getElementById('allSalesContainer');
-        const totalAmount = document.getElementById('totalSalesAmount');
-        const avgAmount = document.getElementById('avgSaleAmount');
-        const totalCount = document.getElementById('totalSalesCount');
-        
-        if (!container) {
-            console.warn('⚠️ Container allSalesContainer no encontrado');
-            return;
-        }
-        
-        if (this.ventas.length === 0 && this.ventasPendientes.length === 0) {
-            container.innerHTML = '<div class="empty-message">No hay ventas registradas</div>';
-            if (totalAmount) totalAmount.textContent = '$0.00';
-            if (avgAmount) avgAmount.textContent = '$0.00';
-            if (totalCount) totalCount.textContent = '0';
-            return;
-        }
-        
-        const total = this.ventas.reduce((s, v) => s + v.total, 0);
-        const promedio = this.ventas.length > 0 ? total / this.ventas.length : 0;
-        
-        if (totalAmount) totalAmount.textContent = `$${total.toFixed(2)}`;
-        if (avgAmount) avgAmount.textContent = `$${promedio.toFixed(2)}`;
-        if (totalCount) totalCount.textContent = this.ventas.length;
-        
-        let html = '';
-        
-        [...this.ventas].reverse().forEach(v => {
-            const fecha = new Date(v.fecha).toLocaleString();
-            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
-            
-            html += `
-                <div class="history-item">
-                    <div>
-                        <div style="font-weight:600;">${v.cliente}</div>
-                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-                    </div>
-                    <div>${cantidadTotal} producto${cantidadTotal !== 1 ? 's' : ''}</div>
-                    <div style="color:var(--accent-color); font-weight:bold;">$${v.total.toFixed(2)}</div>
-                    <div><span class="status status-completed">Completada</span></div>
+                <div class="menu-item" onclick="alert('Tutoriales - Falta implementación')" style="padding: 10px 16px; cursor: pointer;">
+                    📚 Tutoriales
                 </div>
-            `;
-        });
-        
-        this.ventasPendientes.forEach(v => {
-            const fecha = new Date(v.fecha).toLocaleString();
-            const cantidadTotal = v.productos.reduce((s, i) => s + i.cantidad, 0);
-            
-            html += `
-                <div class="history-item" style="border-left:4px solid #f39c12; background:#fff3e0;">
-                    <div>
-                        <div style="font-weight:600;">${v.cliente}</div>
-                        <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-                    </div>
-                    <div>${cantidadTotal} producto${cantidadTotal !== 1 ? 's' : ''}</div>
-                    <div style="color:var(--accent-color); font-weight:bold;">$${v.total.toFixed(2)}</div>
-                    <div><span class="status status-warning">Pendiente</span></div>
+                <div class="menu-item" onclick="App.logout()" style="padding: 10px 16px; cursor: pointer; color: #e74c3c;">
+                    🚪 Cerrar sesión
                 </div>
-            `;
-        });
+            </div>
+        `;
         
-        container.innerHTML = html;
-    },
-    
-    // ===== INVENTARIO =====
-    cargarInventario() {
-        const tableBody = document.getElementById('inventoryTableBody');
-        const lowStockSpan = document.getElementById('lowStockCount');
-        const outStockSpan = document.getElementById('outOfStockCount');
-        
-        if (!tableBody) {
-            console.warn('⚠️ Tabla de inventario no encontrada');
-            return;
-        }
-        
-        if (this.productos.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">No hay productos en inventario</td></tr>';
-            return;
-        }
-        
-        const lowStock = this.productos.filter(p => p.stock > 0 && p.stock < 5).length;
-        const outStock = this.productos.filter(p => p.stock === 0).length;
-        
-        if (lowStockSpan) lowStockSpan.textContent = lowStock;
-        if (outStockSpan) outStockSpan.textContent = outStock;
-        
-        let html = '';
-        this.productos.forEach(p => {
-            const catNombre = this.obtenerNombreCategoria(p.categoria);
-            let estado = 'Disponible', clase = '';
-            if (p.stock === 0) {
-                estado = 'Agotado';
-                clase = 'status-danger';
-            } else if (p.stock < 5) {
-                estado = 'Stock Bajo';
-                clase = 'status-warning';
+        const style = document.createElement('style');
+        style.textContent = `
+            .menu-item:hover {
+                background-color: #f5f5f5;
             }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(menu);
+        
+        avatar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = menu.style.display === 'block';
+            menu.style.display = isVisible ? 'none' : 'block';
             
-            html += `<tr>
-                <td>${p.nombre}</td>
-                <td>${catNombre}</td>
-                <td>$${p.precio.toFixed(2)}</td>
-                <td>${p.stock}</td>
-                <td><span class="${clase}">${estado}</span></td>
-            </tr>`;
+            document.getElementById('menuUserName').textContent = this.usuario?.nombre || 'Vendedora';
+            document.getElementById('menuUserTienda').textContent = this.usuario?.tienda || '';
         });
         
-        tableBody.innerHTML = html;
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && e.target !== avatar) {
+                menu.style.display = 'none';
+            }
+        });
     },
     
     // ===== SPLASH SCREEN =====
