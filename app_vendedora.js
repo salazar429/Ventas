@@ -16,6 +16,20 @@ const App = {
     categoriaActiva: 'todos',
     online: navigator.onLine,
     sincronizando: false,
+
+
+    // Al inicio del archivo, antes de App.init
+if ('caches' in window) {
+    caches.keys().then(keyList => {
+        return Promise.all(keyList.map(key => {
+            if (key.startsWith('vendedora-')) {
+                return caches.delete(key);
+            }
+        }));
+    }).then(() => {
+        console.log('🗑️ Cache viejo eliminado');
+    });
+}
     
     async init() {
         console.log('🚀 Iniciando App Vendedora');
