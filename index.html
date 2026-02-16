@@ -678,20 +678,40 @@
     <!-- Notificación -->
     <div id="notification" class="notification" style="display: none;"></div>
 
-    <!-- Service Worker Registration -->
+
+    <!-- Service Worker Registration - CORREGIDO -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
+                navigator.serviceWorker.register('./service-worker.js')  // Ruta relativa corregida
                     .then(registration => {
-                        console.log('✅ ServiceWorker registrado');
+                        console.log('✅ ServiceWorker registrado correctamente');
+                        console.log('📦 Scope:', registration.scope);
                     })
                     .catch(error => {
                         console.log('❌ Error al registrar ServiceWorker:', error);
                     });
             });
+            
+            // Limpiar caches viejos al cargar (opcional pero recomendado)
+            if ('caches' in window) {
+                caches.keys().then(keyList => {
+                    return Promise.all(keyList.map(key => {
+                        if (key.startsWith('vendedora-') && key !== 'vendedora-cache-v1') {
+                            console.log('🗑️ Eliminando cache viejo:', key);
+                            return caches.delete(key);
+                        }
+                    }));
+                });
+            }
         }
+
+        // Detectar si está instalada como PWA
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA instalada exitosamente');
+        });
     </script>
+
 
     <!-- App JS -->
     <script src="app_vendedora.js"></script>
