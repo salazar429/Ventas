@@ -136,6 +136,64 @@
             display: none !important;
         }
         
+        /* ===== BOTÓN DE INSTALACIÓN FORZADA ===== */
+        .install-pwa-btn {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background: linear-gradient(135deg, #e67e22, #f39c12);
+            color: white;
+            border: none;
+            border-radius: 60px;
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 25px rgba(230, 126, 34, 0.6);
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 700;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 3px solid white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            animation: force-install-pulse 1.5s infinite;
+        }
+
+        .install-pwa-btn:hover {
+            transform: scale(1.1) rotate(-2deg);
+            box-shadow: 0 12px 30px rgba(230, 126, 34, 0.9);
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+
+        .install-icon {
+            font-size: 1.8rem;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .install-text {
+            white-space: nowrap;
+        }
+
+        @keyframes force-install-pulse {
+            0% { transform: scale(1); box-shadow: 0 8px 25px rgba(230, 126, 34, 0.6); }
+            50% { transform: scale(1.05); box-shadow: 0 15px 35px rgba(230, 126, 34, 0.9); }
+            100% { transform: scale(1); box-shadow: 0 8px 25px rgba(230, 126, 34, 0.6); }
+        }
+
+        @media (max-width: 480px) {
+            .install-pwa-btn {
+                padding: 12px 20px;
+                bottom: 70px;
+                left: 10px;
+                font-size: 1rem;
+            }
+            .install-icon {
+                font-size: 1.5rem;
+            }
+        }
+        
         /* ===== ESTADO DE CONEXIÓN ===== */
         .connection-dot {
             width: 12px;
@@ -199,108 +257,81 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+        
         /* ===== ESTILOS PARA VENTAS PENDIENTES ===== */
-.status-warning {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.history-item[style*="border-left"] {
-    background-color: #fff3e0;
-}
-
-#pendientesBanner {
-    animation: slideDown 0.3s ease;
-    margin: 10px 15px;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Mejorar la card de pendientes */
-.card[onclick] {
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.card[onclick]:hover {
-    transform: scale(1.02);
+        .status-warning {
+            background-color: #fff3cd;
+            color: #856404;
         }
 
-        /* ===== ESTILOS PARA VENTAS PENDIENTES ===== */
-.status-warning {
-    background-color: #fff3cd;
-    color: #856404;
-}
+        .history-item[style*="border-left"] {
+            background-color: #fff3e0;
+        }
 
-.history-item[style*="border-left"] {
-    background-color: #fff3e0;
-}
+        #pendientesBanner {
+            animation: slideDown 0.3s ease;
+            margin: 10px 15px;
+        }
 
-#pendientesBanner {
-    animation: slideDown 0.3s ease;
-}
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
+        .card[onclick] {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
 
-/* Mejorar la card de pendientes */
-.card[onclick] {
-    cursor: pointer;
-    transition: transform 0.2s;
-}
+        .card[onclick]:hover {
+            transform: scale(1.02);
+        }
 
-.card[onclick]:hover {
-    transform: scale(1.02);
-}
+        #forzarSyncBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(52, 152, 219, 0.5);
+        }
 
-/* Botón de sincronización */
-#forzarSyncBtn {
-    transition: all 0.3s ease;
-}
+        .low-stock {
+            border-left: 4px solid #f39c12;
+        }
 
-#forzarSyncBtn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(52, 152, 219, 0.5);
-}
+        .out-of-stock {
+            border-left: 4px solid #e74c3c;
+            opacity: 0.7;
+        }
 
-/* Productos con stock bajo */
-.low-stock {
-    border-left: 4px solid #f39c12;
-}
+        .add-to-sale-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
 
-.out-of-stock {
-    border-left: 4px solid #e74c3c;
-    opacity: 0.7;
-}
+        .quantity-input:disabled {
+            background-color: #ecf0f1;
+            cursor: not-allowed;
+        }
 
-/* Deshabilitar botones cuando no hay stock */
-.add-to-sale-btn:disabled {
-    background-color: #95a5a6;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
+        .logout-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+        }
 
-.quantity-input:disabled {
-    background-color: #ecf0f1;
-    cursor: not-allowed;
-}         
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
     </style>
 </head>
 <body>
@@ -355,9 +386,7 @@
                 <div class="user-info">
                     <span id="userName">Vendedora</span>
                     <div class="avatar" id="userAvatar" title="Perfil">V</div>
-                    <button id="logoutBtn" class="logout-btn">
-                        🚪 Salir
-                    </button>
+                    <button id="logoutBtn" class="logout-btn">🚪 Salir</button>
                     <!-- PUNTO DE ESTADO DE CONEXIÓN -->
                     <div id="connectionDot" class="connection-dot online" title="Conectado"></div>
                 </div>
@@ -372,15 +401,10 @@
             </div>
             <div class="category-filter" id="categoryFilterContainer">
                 <button class="category-btn active" data-category="todos">Todos</button>
-                <button class="category-btn" data-category="ropa">Ropa</button>
-                <button class="category-btn" data-category="calzado">Calzado</button>
-                <button class="category-btn" data-category="accesorios">Accesorios</button>
-                <button class="category-btn" data-category="electrónica">Electrónica</button>
-                <button class="category-btn" data-category="hogar">Hogar</button>
             </div>
         </div>
 
-        <!-- Botón flotante -->
+        <!-- Botón flotante de venta actual -->
         <button id="floatingSaleBtn" class="floating-sale-btn">
             <span class="floating-icon">🛒</span>
             <span class="floating-text">Venta Actual</span>
@@ -644,6 +668,12 @@
             </a>
         </nav>
     </div>
+
+    <!-- BOTÓN DE INSTALACIÓN FORZADA PWA (SIEMPRE VISIBLE) -->
+    <button id="installButton" class="install-pwa-btn">
+        <span class="install-icon">⚡</span>
+        <span class="install-text">INSTALAR AHORA</span>
+    </button>
 
     <!-- Notificación -->
     <div id="notification" class="notification" style="display: none;"></div>
