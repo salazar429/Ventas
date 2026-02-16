@@ -1,12 +1,13 @@
 {
-  "name": "Facturación Vendedoras",
-  "short_name": "Facturación",
-  "description": "Sistema de facturación PWA para vendedoras",
-  "start_url": "/",
+  "name": "Vendedora - Sistema de Facturación",
+  "short_name": "Vendedora",
+  "description": "Sistema de facturación móvil para vendedoras",
+  "start_url": "/Ventas/",
   "display": "standalone",
   "background_color": "#2c3e50",
-  "theme_color": "#2c3e50",
+  "theme_color": "#3498db",
   "orientation": "portrait",
+  "scope": "/Ventas/",
   "icons": [
     {
       "src": "icons/icon-192.png",
