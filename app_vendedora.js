@@ -16,23 +16,14 @@ const App = {
     categoriaActiva: 'todos',
     online: navigator.onLine,
     sincronizando: false,
+    installPromptEvent: null,
 
-
-    // Al inicio del archivo, antes de App.init
-if ('caches' in window) {
-    caches.keys().then(keyList => {
-        return Promise.all(keyList.map(key => {
-            if (key.startsWith('vendedora-')) {
-                return caches.delete(key);
-            }
-        }));
-    }).then(() => {
-        console.log('🗑️ Cache viejo eliminado');
-    });
-}
-    
+    // ===== INIT =====
     async init() {
         console.log('🚀 Iniciando App Vendedora');
+        
+        // Limpiar cache antiguo al iniciar
+        await this.limpiarCacheViejo();
         
         this.setupConnectionListener();
         await this.cargarCategoriasLocales();
@@ -54,6 +45,23 @@ if ('caches' in window) {
         setTimeout(() => {
             this.actualizarTodasLasVistas();
         }, 500);
+    },
+    
+    // ===== LIMPIAR CACHE VIEJO =====
+    async limpiarCacheViejo() {
+        if ('caches' in window) {
+            try {
+                const keyList = await caches.keys();
+                await Promise.all(keyList.map(key => {
+                    if (key.startsWith('vendedora-')) {
+                        return caches.delete(key);
+                    }
+                }));
+                console.log('🗑️ Cache viejo eliminado');
+            } catch (error) {
+                console.error('Error limpiando cache:', error);
+            }
+        }
     },
     
     // ===== ACTUALIZAR TODAS LAS VISTAS =====
@@ -142,7 +150,7 @@ if ('caches' in window) {
         this.actualizarContadorProductos();
     },
     
-    // ===== INVENTARIO (CORREGIDO) =====
+    // ===== INVENTARIO =====
     cargarInventario() {
         console.log('📦 Cargando inventario');
         
@@ -156,7 +164,6 @@ if ('caches' in window) {
             return;
         }
         
-        // ✅ ACTUALIZAR TOTAL DE PRODUCTOS EN INVENTARIO
         if (inventoryTotalSpan) {
             inventoryTotalSpan.textContent = this.productos.length;
             console.log('✅ Total productos inventario actualizado:', this.productos.length);
@@ -202,7 +209,7 @@ if ('caches' in window) {
         console.log('✅ Inventario actualizado');
     },
     
-    // ===== CARGAR PRODUCTOS DEL SERVIDOR (CORREGIDO) =====
+    // ===== CARGAR PRODUCTOS DEL SERVIDOR =====
     async cargarProductosDelServidor() {
         try {
             const response = await fetch(`${API_URL}/api/productos`);
@@ -217,7 +224,6 @@ if ('caches' in window) {
                 this.actualizarDashboard();
                 this.actualizarContadorProductos();
                 
-                // ✅ ACTUALIZAR TOTAL EN INVENTARIO
                 const inventoryTotalSpan = document.getElementById('inventoryTotalProducts');
                 if (inventoryTotalSpan) inventoryTotalSpan.textContent = this.productos.length;
             }
@@ -229,7 +235,7 @@ if ('caches' in window) {
         }
     },
     
-    // ===== CARGAR PRODUCTOS LOCALES (CORREGIDO) =====
+    // ===== CARGAR PRODUCTOS LOCALES =====
     async cargarProductosLocales() {
         const prods = localStorage.getItem('productos');
         if (prods) {
@@ -240,7 +246,6 @@ if ('caches' in window) {
                 this.actualizarDashboard();
                 this.actualizarContadorProductos();
                 
-                // ✅ ACTUALIZAR TOTAL EN INVENTARIO
                 const inventoryTotalSpan = document.getElementById('inventoryTotalProducts');
                 if (inventoryTotalSpan) inventoryTotalSpan.textContent = this.productos.length;
             }
@@ -1376,113 +1381,95 @@ if ('caches' in window) {
     },
 
     // ===== INSTALACIÓN FORZADA PWA =====
-setupForcedInstall() {
-    const installButton = document.getElementById('installButton');
-    if (!installButton) return;
-    
-    // Variable para guardar el evento de instalación
-    this.installPromptEvent = null;
-    
-    // Capturar el evento beforeinstallprompt
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        this.installPromptEvent = e;
-        console.log('📲 PWA lista para instalar');
+    setupForcedInstall() {
+        const installButton = document.getElementById('installButton');
+        if (!installButton) return;
         
-        // Mostrar botón si no está instalada
-        if (!this.isPWAInstalled()) {
-            installButton.style.display = 'flex';
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.installPromptEvent = e;
+            console.log('📲 PWA lista para instalar');
+            
+            if (!this.isPWAInstalled()) {
+                installButton.style.display = 'flex';
+            }
+        });
+        
+        installButton.addEventListener('click', async () => {
+            await this.forceInstallPWA();
+        });
+        
+        window.addEventListener('appinstalled', () => {
+            this.installPromptEvent = null;
+            installButton.style.display = 'none';
+            this.mostrarNotificacion('✅ App instalada correctamente');
+            console.log('✅ PWA instalada');
+        });
+        
+        if (this.isPWAInstalled()) {
+            installButton.style.display = 'none';
         }
-    });
-    
-    // Forzar instalación al hacer clic
-    installButton.addEventListener('click', async () => {
-        await this.forceInstallPWA();
-    });
-    
-    // Detectar instalación exitosa
-    window.addEventListener('appinstalled', () => {
-        this.installPromptEvent = null;
-        installButton.style.display = 'none';
-        this.mostrarNotificacion('✅ App instalada correctamente');
-        console.log('✅ PWA instalada');
-    });
-    
-    // Verificar si ya está instalada al inicio
-    if (this.isPWAInstalled()) {
-        installButton.style.display = 'none';
-    }
-},
+    },
 
-async forceInstallPWA() {
-    const installButton = document.getElementById('installButton');
-    
-    // Si ya está instalada
-    if (this.isPWAInstalled()) {
-        this.mostrarNotificacion('📱 La app ya está instalada');
-        installButton.style.display = 'none';
-        return;
-    }
-    
-    // Si tenemos el evento de instalación
-    if (this.installPromptEvent) {
-        installButton.style.display = 'none';
+    async forceInstallPWA() {
+        const installButton = document.getElementById('installButton');
         
-        // Mostrar el prompt de instalación
-        this.installPromptEvent.prompt();
+        if (this.isPWAInstalled()) {
+            this.mostrarNotificacion('📱 La app ya está instalada');
+            installButton.style.display = 'none';
+            return;
+        }
         
-        // Esperar respuesta
-        const { outcome } = await this.installPromptEvent.userChoice;
-        
-        if (outcome === 'accepted') {
-            this.mostrarNotificacion('✅ Instalando aplicación...');
+        if (this.installPromptEvent) {
+            installButton.style.display = 'none';
+            this.installPromptEvent.prompt();
+            
+            const { outcome } = await this.installPromptEvent.userChoice;
+            
+            if (outcome === 'accepted') {
+                this.mostrarNotificacion('✅ Instalando aplicación...');
+            } else {
+                this.mostrarNotificacion('❌ Instalación cancelada');
+                setTimeout(() => {
+                    if (!this.isPWAInstalled()) {
+                        installButton.style.display = 'flex';
+                    }
+                }, 3000);
+            }
+            
+            this.installPromptEvent = null;
         } else {
-            this.mostrarNotificacion('❌ Instalación cancelada');
-            // Reaparecer botón después de 3 segundos
+            this.tryAlternativeInstall();
+        }
+    },
+
+    tryAlternativeInstall() {
+        const installButton = document.getElementById('installButton');
+        
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/.test(navigator.userAgent);
+        
+        if (isIOS) {
+            this.mostrarNotificacion('🍎 En iOS: Menú Compartir > Añadir a Pantalla de Inicio', 5000);
+        } else if (isAndroid) {
+            this.mostrarNotificacion('📱 Toca los 3 puntos > Instalar aplicación', 4000);
+            
             setTimeout(() => {
                 if (!this.isPWAInstalled()) {
                     installButton.style.display = 'flex';
                 }
-            }, 3000);
+            }, 4000);
+        } else {
+            this.mostrarNotificacion('❌ La instalación no está disponible ahora. Intenta más tarde', 3000);
         }
-        
-        this.installPromptEvent = null;
-    } else {
-        // Si no hay evento, intentar métodos alternativos
-        this.tryAlternativeInstall();
+    },
+
+    isPWAInstalled() {
+        return window.matchMedia('(display-mode: standalone)').matches || 
+               window.navigator.standalone === true ||
+               window.matchMedia('(display-mode: fullscreen)').matches ||
+               window.matchMedia('(display-mode: minimal-ui)').matches;
     }
-},
-
-tryAlternativeInstall() {
-    const installButton = document.getElementById('installButton');
-    
-    // Detectar plataforma
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isAndroid = /Android/.test(navigator.userAgent);
-    
-    if (isIOS) {
-        this.mostrarNotificacion('🍎 En iOS: Menú Compartir > Añadir a Pantalla de Inicio', 5000);
-    } else if (isAndroid) {
-        this.mostrarNotificacion('📱 Toca los 3 puntos > Instalar aplicación', 4000);
-        
-        // Mostrar botón de nuevo después
-        setTimeout(() => {
-            if (!this.isPWAInstalled()) {
-                installButton.style.display = 'flex';
-            }
-        }, 4000);
-    } else {
-        this.mostrarNotificacion('❌ La instalación no está disponible ahora. Intenta más tarde', 3000);
-    }
-},
-
-isPWAInstalled() {
-    return window.matchMedia('(display-mode: standalone)').matches || 
-           window.navigator.standalone === true ||
-           window.matchMedia('(display-mode: fullscreen)').matches ||
-           window.matchMedia('(display-mode: minimal-ui)').matches;
-}
-
 };
 
 window.App = App;
