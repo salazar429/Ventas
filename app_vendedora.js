@@ -1,5 +1,5 @@
 // ===========================================
-// APP VENDEDORA - VERSIÓN FINAL CORREGIDA
+// APP VENDEDORAA - VERSIÓN FINAL CORREGIDA
 // CON TODOS LOS CONTADORES FUNCIONANDO
 // ===========================================
 
